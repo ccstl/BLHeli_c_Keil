@@ -1,0 +1,113 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Tool Versions:</h2>
+IDE-Version: ¦ÌVision V5.25.3.0
+Copyright (C) 2018 ARM Ltd and ARM Germany GmbH. All rights reserved.
+License Information: l l, bc, LIC=QFHWF-6D9XB-4FKI9-4EMF4-8HHEC-S48J6
+ 
+Tool Versions:
+Toolchain:       PK51 Prof. Developers Kit  Version: 9.59.0.0
+Toolchain Path:  D:\Keil_v5\C51\BIN
+C Compiler:      C51.exe V9.59.0.0
+Assembler:       A51.exe V8.2.7.0
+Linker/Locator:  BL51.exe V6.22.2.0
+Library Manager: LIB51.exe V4.30.1.0
+Hex Converter:   OH51.exe V2.7.0.0
+CPU DLL:         S8051.DLL V3.122.0.0
+Dialog DLL:      DCYG.DLL V2.75.0.0 
+<h2>Project:</h2>
+D:\Documents\Desktop\BLHeli_s\BLHeli_s.uvproj
+Project File Date:  10/02/2019
+
+<h2>Output:</h2>
+Rebuild target 'EFM8BB21'
+assembling SILABS_STARTUP.A51...
+compiling main.c...
+main.c(5): error C202: 'WDTCN': undefined identifier
+main.c(6): error C202: 'WDTCN': undefined identifier
+main.c(8): error C202: 'SP': undefined identifier
+main.c(10): error C202: 'VDM0CN': undefined identifier
+main.c(11): error C202: 'RSTSRC': undefined identifier
+main.c(13): error C202: 'CLKSEL': undefined identifier
+main.c(15): error C202: 'call': undefined identifier
+main.c(15): error C141: syntax error near 'switch_power_off', expected ';'
+main.c(18): error C202: 'P0MDIN': undefined identifier
+main.c(19): error C202: 'P0MDOUT': undefined identifier
+main.c(20): error C202: 'P0': undefined identifier
+main.c(21): error C202: 'P0SKIP': undefined identifier
+main.c(22): error C202: 'P1': undefined identifier
+main.c(23): error C202: 'P1MDIN': undefined identifier
+main.c(24): error C202: 'P1MDOUT': undefined identifier
+main.c(25): error C202: 'P1': undefined identifier
+main.c(26): error C202: 'P1SKIP': undefined identifier
+main.c(27): error C202: 'P2MDOUT': undefined identifier
+main.c(31): error C202: 'Initialize_Xbar': undefined identifier
+main.c(31): error C141: syntax error near 'call', expected ';'
+main.c(35): error C141: syntax error near 'clear_ram', expected ';'
+main.c(36): error C141: syntax error near '@', expected ';'
+main.c(37): error C141: syntax error near 'djnz', expected ';'
+main.c(39): error C141: syntax error near 'call', expected ';'
+main.c(48): error C141: syntax error near 'clr', expected ';'
+compiling public.c...
+public.c(4): error C202: 'All_pwmFETs_Off': undefined identifier
+public.c(4): error C141: syntax error near 'All_comFETs_Off', expected ';'
+public.c(11): error C202: 'PCA0MD': undefined identifier
+public.c(12): warning C315: unknown #directive 'IF'
+public.c(13): warning C315: unknown #directive 'IF'
+public.c(14): error C202: 'PCA0PWM': undefined identifier
+public.c(15): warning C315: unknown #directive 'ELSE'
+public.c(16): error C202: 'PCA0PWM': undefined identifier
+public.c(17): warning C315: unknown #directive 'ENDIF'
+public.c(18): error C202: 'PCA0CENT': undefined identifier
+public.c(19): warning C315: unknown #directive 'ELSE'
+public.c(20): warning C315: unknown #directive 'IF'
+public.c(21): error C202: 'PCA0PWM': undefined identifier
+public.c(22): warning C315: unknown #directive 'ELSE'
+public.c(23): error C202: 'PCA0PWM': undefined identifier
+public.c(24): warning C315: unknown #directive 'ENDIF'
+public.c(25): error C202: 'PCA0CENT': undefined identifier
+public.c(26): warning C315: unknown #directive 'ENDIF'
+public.c(31): error C202: 'XBR2': undefined identifier
+public.c(32): error C202: 'XBR1': undefined identifier
+public.c(37): error C202: 'CMP0CN0': undefined identifier
+public.c(38): error C202: 'CMP0MD': undefined identifier
+public.c(43): error C202: 'REF0CN': undefined identifier
+public.c(44): warning C315: unknown #directive 'IF'
+public.c(45): error C202: 'ADC0CF': undefined identifier
+public.c(46): warning C315: unknown #directive 'ELSE'
+public.c(47): error C202: 'ADC0CF': undefined identifier
+public.c(48): warning C315: unknown #directive 'ENDIF'
+public.c(49): error C202: 'ADC0MX': undefined identifier
+public.c(50): error C202: 'ADC0CN0': undefined identifier
+public.c(51): error C202: 'ADC0CN1': undefined identifier
+public.c(55): error C244: 'CLKSEL': can't initialize, bad type or class
+public.c(55): error C132: 'CLKSEL': not in formal parameter list
+public.c(56): error C244: 'SFRPAGE': can't initialize, bad type or class
+public.c(56): error C132: 'SFRPAGE': not in formal parameter list
+public.c(57): error C244: 'PFE0CN': can't initialize, bad type or class
+public.c(57): error C132: 'PFE0CN': not in formal parameter list
+public.c(58): error C244: 'SFRPAGE': can't initialize, bad type or class
+public.c(58): error C132: 'SFRPAGE': not in formal parameter list
+public.c(59): error C244: 'Clock_Set_At_48MHz': can't initialize, bad type or class
+public.c(61): error C132: 'Clock_Set_At_48MHz': not in formal parameter list
+public.c(61): error C141: syntax error near 'void', expected ';'
+public.c(62): error C132: 'Set_MCU_Clk_48MHz': not in formal parameter list
+public.c(62): error C141: syntax error near 'SFRPAGE', expected ';'
+public.c(62): error C244: 'SFRPAGE': can't initialize, bad type or class
+public.c(62): error C132: 'SFRPAGE': not in formal parameter list
+public.c(63): error C244: 'PFE0CN': can't initialize, bad type or class
+public.c(63): error C132: 'PFE0CN': not in formal parameter list
+public.c(64): error C244: 'SFRPAGE': can't initialize, bad type or class
+public.c(64): error C132: 'SFRPAGE': not in formal parameter list
+public.c(65): error C244: 'CLKSEL': can't initialize, bad type or class
+public.c(65): error C132: 'CLKSEL': not in formal parameter list
+public.c(66): error C244: 'Clock_Set_At_48MHz': can't initialize, bad type or class
+public.c(67): error C132: 'Clock_Set_At_48MHz': not in formal parameter list
+public.c(67): error C141: syntax error near '', expected ';'
+Target not created.
+Build Time Elapsed:  00:00:01
+</pre>
+</body>
+</html>

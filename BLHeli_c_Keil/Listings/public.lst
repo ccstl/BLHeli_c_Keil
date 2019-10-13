@@ -1,0 +1,138 @@
+C51 COMPILER V9.59.0.0   PUBLIC                                                            10/02/2019 15:30:53 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE PUBLIC
+OBJECT MODULE PLACED IN .\Objects\public.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE public.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\pu
+                    -blic.lst) TABS(2) OBJECT(.\Objects\public.obj)
+
+line level    source
+
+   1          void switch_power_off()
+   2          {
+   3   1        All_pwmFETs_Off   // Turn off all pwm fets
+   4   1        All_comFETs_Off   // Turn off all commutation fets
+*** ERROR C202 IN LINE 4 OF public.c: 'All_pwmFETs_Off': undefined identifier
+*** ERROR C141 IN LINE 4 OF public.c: syntax error near 'All_comFETs_Off', expected ';'
+   5   1        Set_Pwms_Off
+   6   1      }
+   7          
+   8          void Initialize_PCA()
+   9          {
+  10   1        PCA0CN0 = 0x40;       // PCA enabled
+  11   1        PCA0MD = 0x08;        // PCA clock is system clock
+*** ERROR C202 IN LINE 11 OF public.c: 'PCA0MD': undefined identifier
+  12   1      #IF FETON_DELAY == 0
+*** WARNING C315 IN LINE 12 OF public.c: unknown #directive 'IF'
+  13   1        #IF MCU_48MHZ == 0
+*** WARNING C315 IN LINE 13 OF public.c: unknown #directive 'IF'
+  14   1          PCA0PWM = 0x82;       // PCA ARSEL set and 10bits pwm
+*** ERROR C202 IN LINE 14 OF public.c: 'PCA0PWM': undefined identifier
+  15   1        #ELSE
+*** WARNING C315 IN LINE 15 OF public.c: unknown #directive 'ELSE'
+  16   1          PCA0PWM = 0x83;       // PCA ARSEL set and 11bits pwm
+*** ERROR C202 IN LINE 16 OF public.c: 'PCA0PWM': undefined identifier
+  17   1        #ENDIF
+*** WARNING C315 IN LINE 17 OF public.c: unknown #directive 'ENDIF'
+  18   1          PCA0CENT = 0x00;        // Edge aligned pwm
+*** ERROR C202 IN LINE 18 OF public.c: 'PCA0CENT': undefined identifier
+  19   1      #ELSE
+*** WARNING C315 IN LINE 19 OF public.c: unknown #directive 'ELSE'
+  20   1        #IF MCU_48MHZ == 0
+*** WARNING C315 IN LINE 20 OF public.c: unknown #directive 'IF'
+  21   1          PCA0PWM = 0x81;       // PCA ARSEL set and 9bits pwm
+*** ERROR C202 IN LINE 21 OF public.c: 'PCA0PWM': undefined identifier
+  22   1        #ELSE
+*** WARNING C315 IN LINE 22 OF public.c: unknown #directive 'ELSE'
+  23   1          PCA0PWM = 0x82;       // PCA ARSEL set and 10bits pwm
+*** ERROR C202 IN LINE 23 OF public.c: 'PCA0PWM': undefined identifier
+  24   1        #ENDIF
+*** WARNING C315 IN LINE 24 OF public.c: unknown #directive 'ENDIF'
+  25   1          PCA0CENT = 0x03;        // Center aligned pwm
+*** ERROR C202 IN LINE 25 OF public.c: 'PCA0CENT': undefined identifier
+  26   1      #ENDIF
+*** WARNING C315 IN LINE 26 OF public.c: unknown #directive 'ENDIF'
+  27   1      }
+  28          
+  29          void Initialize_Xbar()
+  30          {
+  31   1        XBR2 = 0x40;  // Xbar enabled     
+*** ERROR C202 IN LINE 31 OF public.c: 'XBR2': undefined identifier
+  32   1        XBR1 = 0x02;  // CEX0 and CEX1 routed to pins   
+*** ERROR C202 IN LINE 32 OF public.c: 'XBR1': undefined identifier
+  33   1      }
+  34          
+C51 COMPILER V9.59.0.0   PUBLIC                                                            10/02/2019 15:30:53 PAGE 2   
+
+  35          void Initialize_Comparator()
+  36          {
+  37   1        CMP0CN0 = 0x80; // Comparator enabled, no hysteresis
+*** ERROR C202 IN LINE 37 OF public.c: 'CMP0CN0': undefined identifier
+  38   1        CMP0MD = 0x00;  // Comparator response time 100ns
+*** ERROR C202 IN LINE 38 OF public.c: 'CMP0MD': undefined identifier
+  39   1      }
+  40          
+  41          void Initialize_Adc()
+  42          {
+  43   1        REF0CN = 0x0C;  // Set vdd (3.3V) as reference. Enable temp sensor and bias
+*** ERROR C202 IN LINE 43 OF public.c: 'REF0CN': undefined identifier
+  44   1      #IF MCU_48MHZ == 0
+*** WARNING C315 IN LINE 44 OF public.c: unknown #directive 'IF'
+  45   1        ADC0CF = 0x59;  // ADC clock 2MHz, PGA gain 1
+*** ERROR C202 IN LINE 45 OF public.c: 'ADC0CF': undefined identifier
+  46   1      #ELSE
+*** WARNING C315 IN LINE 46 OF public.c: unknown #directive 'ELSE'
+  47   1        ADC0CF = 0xB9;  // ADC clock 2MHz, PGA gain 1
+*** ERROR C202 IN LINE 47 OF public.c: 'ADC0CF': undefined identifier
+  48   1      #ENDIF
+*** WARNING C315 IN LINE 48 OF public.c: unknown #directive 'ENDIF'
+  49   1        ADC0MX = 0x10;  // Select temp sensor input
+*** ERROR C202 IN LINE 49 OF public.c: 'ADC0MX': undefined identifier
+  50   1        ADC0CN0 = 0x80; // ADC enabled 
+*** ERROR C202 IN LINE 50 OF public.c: 'ADC0CN0': undefined identifier
+  51   1        ADC0CN1 = 0x01; // Common mode buffer enabled
+*** ERROR C202 IN LINE 51 OF public.c: 'ADC0CN1': undefined identifier
+  52   1      }
+  53          
+  54          void Set_MCU_Clk_24MHz()
+  55            CLKSEL = 0x13;    // Set clock to 24MHz
+*** ERROR C244 IN LINE 55 OF public.c: 'CLKSEL': can't initialize, bad type or class
+*** ERROR C132 IN LINE 55 OF public.c: 'CLKSEL': not in formal parameter list
+  56            SFRPAGE = 0x10;
+*** ERROR C244 IN LINE 56 OF public.c: 'SFRPAGE': can't initialize, bad type or class
+*** ERROR C132 IN LINE 56 OF public.c: 'SFRPAGE': not in formal parameter list
+  57            PFE0CN = 0x00;    // Set flash timing for 24MHz
+*** ERROR C244 IN LINE 57 OF public.c: 'PFE0CN': can't initialize, bad type or class
+*** ERROR C132 IN LINE 57 OF public.c: 'PFE0CN': not in formal parameter list
+  58            SFRPAGE = 0x00;
+*** ERROR C244 IN LINE 58 OF public.c: 'SFRPAGE': can't initialize, bad type or class
+*** ERROR C132 IN LINE 58 OF public.c: 'SFRPAGE': not in formal parameter list
+  59            Clock_Set_At_48MHz = 0
+*** ERROR C244 IN LINE 59 OF public.c: 'Clock_Set_At_48MHz': can't initialize, bad type or class
+  60          
+  61          void Set_MCU_Clk_48MHz()
+*** ERROR C132 IN LINE 61 OF public.c: 'Clock_Set_At_48MHz': not in formal parameter list
+*** ERROR C141 IN LINE 61 OF public.c: syntax error near 'void', expected ';'
+  62            SFRPAGE = 0x10;
+*** ERROR C132 IN LINE 62 OF public.c: 'Set_MCU_Clk_48MHz': not in formal parameter list
+*** ERROR C141 IN LINE 62 OF public.c: syntax error near 'SFRPAGE', expected ';'
+*** ERROR C244 IN LINE 62 OF public.c: 'SFRPAGE': can't initialize, bad type or class
+*** ERROR C132 IN LINE 62 OF public.c: 'SFRPAGE': not in formal parameter list
+  63            PFE0CN = 0x30;    // Set flash timing for 48MHz
+*** ERROR C244 IN LINE 63 OF public.c: 'PFE0CN': can't initialize, bad type or class
+*** ERROR C132 IN LINE 63 OF public.c: 'PFE0CN': not in formal parameter list
+  64            SFRPAGE = 0x00;
+*** ERROR C244 IN LINE 64 OF public.c: 'SFRPAGE': can't initialize, bad type or class
+*** ERROR C132 IN LINE 64 OF public.c: 'SFRPAGE': not in formal parameter list
+  65            CLKSEL = 0x03;    // Set clock to 48MHz
+*** ERROR C244 IN LINE 65 OF public.c: 'CLKSEL': can't initialize, bad type or class
+C51 COMPILER V9.59.0.0   PUBLIC                                                            10/02/2019 15:30:53 PAGE 3   
+
+*** ERROR C132 IN LINE 65 OF public.c: 'CLKSEL': not in formal parameter list
+  66            Clock_Set_At_48MHz = 1
+*** ERROR C244 IN LINE 66 OF public.c: 'Clock_Set_At_48MHz': can't initialize, bad type or class
+  67          
+*** ERROR C132 IN LINE 67 OF public.c: 'Clock_Set_At_48MHz': not in formal parameter list
+*** ERROR C141 IN LINE 67 OF public.c: syntax error near '', expected ';'
+
+C51 COMPILATION COMPLETE.  12 WARNING(S),  43 ERROR(S)

@@ -1,0 +1,96 @@
+C51 COMPILER V9.59.0.0   MAIN                                                              10/02/2019 15:30:52 PAGE 1   
+
+
+C51 COMPILER V9.59.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\Objects\main.obj
+COMPILER INVOKED BY: D:\Keil_v5\C51\BIN\C51.EXE main.c OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEXTEND PRINT(.\Listings\main
+                    -.lst) TABS(2) OBJECT(.\Objects\main.obj)
+
+line level    source
+
+   1          
+   2          void main()
+   3          {
+   4   1        // Disable the WDT.
+   5   1        WDTCN = 0xDE;   // Disable watchdog
+*** ERROR C202 IN LINE 5 OF main.c: 'WDTCN': undefined identifier
+   6   1        WDTCN = 0xAD;   
+*** ERROR C202 IN LINE 6 OF main.c: 'WDTCN': undefined identifier
+   7   1        // Initialize stack
+   8   1        SP = 0xc0;      // Stack = 64 upper bytes of RAM
+*** ERROR C202 IN LINE 8 OF main.c: 'SP': undefined identifier
+   9   1        // Initialize VDD monitor
+  10   1        VDM0CN |= 0x80;     // Enable the VDD monitor
+*** ERROR C202 IN LINE 10 OF main.c: 'VDM0CN': undefined identifier
+  11   1        RSTSRC = 0x06;    // Set missing clock and VDD monitor as a reset source if not 1S capable
+*** ERROR C202 IN LINE 11 OF main.c: 'RSTSRC': undefined identifier
+  12   1        // Set clock frequency
+  13   1        CLKSEL = 0x00;    // Set clock divider to 1
+*** ERROR C202 IN LINE 13 OF main.c: 'CLKSEL': undefined identifier
+  14   1        // Switch power off
+  15   1        call  switch_power_off
+*** ERROR C202 IN LINE 15 OF main.c: 'call': undefined identifier
+*** ERROR C141 IN LINE 15 OF main.c: syntax error near 'switch_power_off', expected ';'
+  16   1        // Ports initialization
+  17   1        P0 = P0_INIT;
+  18   1        P0MDIN = P0_DIGITAL;
+*** ERROR C202 IN LINE 18 OF main.c: 'P0MDIN': undefined identifier
+  19   1        P0MDOUT = P0_PUSHPULL;
+*** ERROR C202 IN LINE 19 OF main.c: 'P0MDOUT': undefined identifier
+  20   1        P0 = P0_INIT;
+*** ERROR C202 IN LINE 20 OF main.c: 'P0': undefined identifier
+  21   1        P0SKIP = P0_SKIP;
+*** ERROR C202 IN LINE 21 OF main.c: 'P0SKIP': undefined identifier
+  22   1        P1 = P1_INIT;
+*** ERROR C202 IN LINE 22 OF main.c: 'P1': undefined identifier
+  23   1        P1MDIN = P1_DIGITAL;
+*** ERROR C202 IN LINE 23 OF main.c: 'P1MDIN': undefined identifier
+  24   1        P1MDOUT = P1_PUSHPULL;
+*** ERROR C202 IN LINE 24 OF main.c: 'P1MDOUT': undefined identifier
+  25   1        P1 = P1_INIT;
+*** ERROR C202 IN LINE 25 OF main.c: 'P1': undefined identifier
+  26   1        P1SKIP = P1_SKIP;
+*** ERROR C202 IN LINE 26 OF main.c: 'P1SKIP': undefined identifier
+  27   1        P2MDOUT = P2_PUSHPULL;
+*** ERROR C202 IN LINE 27 OF main.c: 'P2MDOUT': undefined identifier
+  28   1        // Initialize the XBAR and related functionality
+  29   1        Initialize_Xbar
+  30   1        // Switch power off again, after initializing ports
+  31   1        call  switch_power_off
+*** ERROR C202 IN LINE 31 OF main.c: 'Initialize_Xbar': undefined identifier
+*** ERROR C141 IN LINE 31 OF main.c: syntax error near 'call', expected ';'
+  32   1        // Clear RAM
+  33   1        clr A       // Clear accumulator
+  34   1        mov Temp1, A      // Clear Temp1
+C51 COMPILER V9.59.0.0   MAIN                                                              10/02/2019 15:30:52 PAGE 2   
+
+  35   1        clear_ram:  
+*** ERROR C141 IN LINE 35 OF main.c: syntax error near 'clear_ram', expected ';'
+  36   1        mov @Temp1, A     // Clear RAM
+*** ERROR C141 IN LINE 36 OF main.c: syntax error near '@', expected ';'
+  37   1        djnz Temp1, clear_ram // Is A not zero? - jump
+*** ERROR C141 IN LINE 37 OF main.c: syntax error near 'djnz', expected ';'
+  38   1        // Set default programmed parameters
+  39   1        call  set_default_parameters
+*** ERROR C141 IN LINE 39 OF main.c: syntax error near 'call', expected ';'
+  40   1        // Read all programmed parameters
+  41   1        call read_all_eeprom_parameters
+  42   1        // Set beep strength
+  43   1        mov Temp1, #Pgm_Beep_Strength
+  44   1        mov Beep_Strength, @Temp1
+  45   1        // Set initial arm variable
+  46   1        mov Initial_Arm, #1
+  47   1        // Initializing beep
+  48   1        clr IE_EA     // Disable interrupts explicitly
+*** ERROR C141 IN LINE 48 OF main.c: syntax error near 'clr', expected ';'
+  49   1        call wait200ms  
+  50   1        call beep_f1
+  51   1        call wait30ms
+  52   1        call beep_f2
+  53   1        call wait30ms
+  54   1        call beep_f3
+  55   1        call wait30ms
+  56   1        call  led_control
+  57   1      }
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  25 ERROR(S)
