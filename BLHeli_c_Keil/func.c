@@ -1039,7 +1039,71 @@ beep_off:		// Fets off loop
 	BcomFET_off		// BcomFET off
 	ret
 
+//**** **** **** **** **** **** **** **** **** **** **** **** ****
+//
+// Switch power off routine
+//
+// No assumptions
+//
+// Switches all fets off 
+//
+//**** **** **** **** **** **** **** **** **** **** **** **** ****
+switch_power_off()
+{
+	All_pwmFETs_Off		// Turn off all pwm fets
+	All_comFETs_Off		// Turn off all commutation fets
+	Set_Pwms_Off
+	ret
+}
 
+//**** **** **** **** **** **** **** **** **** **** **** **** ****
+//
+// Set default parameters
+//
+// No assumptions
+//
+// Sets default programming parameters
+//
+//**** **** **** **** **** **** **** **** **** **** **** **** ****
+void set_default_parameters()
+{
+	_Pgm_Gov_P_Gain = 0xFF;	// Governor P gain
+	_Pgm_Gov_I_Gain = 0xFF;	// Governor I gain
+	_Pgm_Gov_Mode = 0xFF;	// Governor mode
+	_Pgm_Low_Voltage_Lim = 0xFF;	// Low voltage limit
+	_Pgm_Motor_Gain = 0xFF;	// Multi gain
+	_Pgm_Motor_Idle = 0xFF;	
+	Pgm_Startup_Pwr = DEFAULT_PGM_STARTUP_PWR;
+	_Pgm_Pwm_Freq = 0xFF;	// Pwm freq
+	Pgm_Direction = DEFAULT_PGM_DIRECTION;
+
+	Pgm_Enable_TX_Program = DEFAULT_PGM_ENABLE_TX_PROGRAM;
+	_Pgm_Main_Rearm_Start = 0xFF;	// Main rearm start
+	_Pgm_Gov_Setup_Target = 0xFF;	// Governor setup target
+	_Pgm_Startup_Rpm = 0xFF;	// Startup rpm	
+	_Pgm_Startup_Accel = 0xFF;	// Startup accel
+	_Pgm_Volt_Comp = 0xFF;	// Voltage comp
+	Pgm_Comm_Timing = DEFAULT_PGM_COMM_TIMING;
+	_Pgm_Damping_Force = 0xFF;	// Damping force	
+	_Pgm_Gov_Range = 0xFF;	// Governor range
+	_Pgm_Startup_Method = 0xFF;	// Startup method	
+	Pgm_Min_Throttle = DEFAULT_PGM_MIN_THROTTLE;
+	Pgm_Max_Throttle = DEFAULT_PGM_MAX_THROTTLE;
+	Pgm_Beep_Strength = DEFAULT_PGM_BEEP_STRENGTH;
+	Pgm_Beacon_Strength = DEFAULT_PGM_BEACON_STRENGTH;
+	Pgm_Beacon_Delay = DEFAULT_PGM_BEACON_DELAY;
+	_Pgm_Throttle_Rate = 0xFF;	// Throttle rate	
+	Pgm_Demag_Comp = DEFAULT_PGM_DEMAG_COMP;
+	_Pgm_BEC_Voltage_High = 0xFF;	// Bec voltage high
+	Pgm_Center_Throttle = DEFAULT_PGM_CENTER_THROTTLE;
+	_Pgm_Main_Spoolup_Time = 0xFF;	
+	Pgm_Enable_Temp_Prot = DEFAULT_PGM_ENABLE_TEMP_PROT;
+	Pgm_Enable_Power_Prot = DEFAULT_PGM_ENABLE_POWER_PROT;
+	_Pgm_Enable_Pwm_Input = 0xFF;	// Enable pwm input
+	_Pgm_Pwm_Dither = 0xFF;	// Pwm dither
+	Pgm_Brake_On_Stop = DEFAULT_PGM_BRAKE_ON_STOP;
+	Pgm_LED_Control = DEFAULT_PGM_LED_CONTROL;
+}
 
 //**** **** **** **** **** **** **** **** **** **** **** **** ****
 //
@@ -1057,62 +1121,46 @@ void decode_settings()
 	if(Pgm_Direction < 3) Flags3.PGM_BIDIR = 0;
 	Flags3.PGM_DIR_REV = 0;
 	
-	mov	A, @Temp1
-	jnb	ACC.1, ($+5)
 	if(Pgm_Direction&0x02) Flags3.PGM_DIR_REV = 1;
 	Flags3.PGM_BIDIR_REV = Flags3.PGM_DIR_REV;
 	// Decode startup power
-	Pgm_Startup_Pwr--;
-	Pgm_Startup_Pwr_Decoded = STARTUP_POWER_TABLE[Pgm_Startup_Pwr];
+	Pgm_Startup_Pwr_Decoded = STARTUP_POWER_TABLE[Pgm_Startup_Pwr-1];
 	// Decode low rpm power slope
 	Low_Rpm_Pwr_Slope = Pgm_Startup_Pwr;
-	if(Pgm_Startup_Pwr > 2) Low_Rpm_Pwr_Slope = 2;
+	if(Pgm_Startup_Pwr < 2) Low_Rpm_Pwr_Slope = 2;
 	// Decode demag compensation
-	mov	Temp1, #Pgm_Demag_Comp		
-	mov	A, @Temp1				
 	Demag_Pwr_Off_Thresh = 255	// Set default
 
-	if(Pgm_Demag_Comp != 2) decode_demag_high
+	if(Pgm_Demag_Comp == 2) Demag_Pwr_Off_Thresh = 160;	// Settings for demag comp low
 
-	Demag_Pwr_Off_Thresh = 160;	// Settings for demag comp low
+	if(Pgm_Demag_Comp == 3) Demag_Pwr_Off_Thresh = 130;	// Settings for demag comp high
 
-decode_demag_high:
-	if(Pgm_Demag_Comp != 3) decode_demag_done
-
-	Demag_Pwr_Off_Thresh = 130;	// Settings for demag comp high
-
-decode_demag_done:
 	// Decode temperature protection limit
-	mov	Temp1, #Pgm_Enable_Temp_Prot
-	mov	A, @Temp1
-	mov	Temp1, A
-	if(!Pgm_Enable_Temp_Prot)	decode_temp_done
+	if(Pgm_Enable_Temp_Prot)
+	{
+		A = TEMP_LIMIT-TEMP_LIMIT_STEP;
+		while(Pgm_Enable_Temp_Prot)
+		{
+			A += TEMP_LIMIT_STEP;
+			Pgm_Enable_Temp_Prot--;
+		}
+		Temp_Prot_Limit = A;
+	}
 
-	mov	A, #(TEMP_LIMIT-TEMP_LIMIT_STEP)
-decode_temp_step:
-	add	A, #TEMP_LIMIT_STEP
-	djnz	Temp1, decode_temp_step
-
-decode_temp_done:
-	Temp_Prot_Limit = A;
 	// Decode throttle cal
-	mov	Temp1, #Pgm_Min_Throttle		// Throttle cal is in 4us units
-	mov	A, @Temp1
-	call	scale_throttle_cal
-	mov	Min_Throttle_L, Temp1
-	mov	Min_Throttle_H, Temp2
-	mov	Temp1, #Pgm_Center_Throttle	// Throttle cal is in 4us units
-	mov	A, @Temp1
-	call	scale_throttle_cal
-	mov	Center_Throttle_L, Temp1
-	mov	Center_Throttle_H, Temp2
-	mov	Temp1, #Pgm_Max_Throttle		// Throttle cal is in 4us units
-	mov	A, @Temp1
-	call	scale_throttle_cal
-	mov	Max_Throttle_L, Temp1
-	mov	Max_Throttle_H, Temp2
-	call	switch_power_off
-	ret
+	// Throttle cal is in 4us units
+	scale_throttle_cal(Pgm_Min_Throttle);
+	Min_Throttle_L = Temp1;
+	Min_Throttle_H = Temp2;
+	// Throttle cal is in 4us units
+	scale_throttle_cal(Pgm_Center_Throttle);
+	Center_Throttle_L = Temp1;
+	Center_Throttle_H = Temp2;
+	// Throttle cal is in 4us units
+	scale_throttle_cal(Pgm_Max_Throttle);
+	Max_Throttle_L = Temp1;
+	Max_Throttle_H = Temp2;
+	switch_power_off();
 }
 
 //**** **** **** **** **** **** **** **** **** **** **** **** ****
@@ -1122,44 +1170,28 @@ decode_temp_done:
 // No assumptions
 //
 // Scales a throttle cal value
-// Input is ACC, output is Temp2/Temp1
+// Input:ACC, output:Temp2/Temp1
 //
 //**** **** **** **** **** **** **** **** **** **** **** **** ****
-void scale_throttle_cal()
+void scale_throttle_cal(unsigned char A)
 {
-	mov	Temp3, A
-	mov	B, #0Ch			// Calculate "3%" (for going from 1000us to numerical 1024)
-	mul	AB
-	mov	Temp4, B
-	mov	A, Temp3
-	clr	C				// Shift to 9 bits
-	rlc	A
-	mov	Temp1, A
-	mov	A, #1
-	rlc	A
-	mov	Temp2, A
-	mov	A, Temp1			// Shift to 10 bits
-	clr	C
-	rlc	A
-	mov	Temp1, A
-	mov	A, Temp2
-	rlc	A
-	mov	Temp2, A
-	mov	A, Temp1			// Add "3%"
-	clr	C
-	add	A, Temp4
-	mov	Temp1, A
-	mov	A, Temp2
-	addc	A, #0
-	mov	Temp2, A
+	Temp3 = A;
+	// Calculate "3%" (for going from 1000us to numerical 1024)
+	t = Temp3*0x0C;
+	Temp4 = (char)(t>>8);
+	// Shift to 9 bits
+	Temp1 = Temp3<<1;
+	Temp2 = 1<<1;
+	// Shift to 10 bits
+	Temp1 = Temp1<<1;
+	Temp2 = Temp2<<1;
+	// Add "3%"
+	Temp1 = Temp1 + Temp4;
+	if(Temp1+Temp4>255) Temp2 = Temp2 + 1;
 #IF MCU_48MHZ == 1
-	mov	A, Temp1			// Shift to 11 bits
-	clr	C
-	rlc	A
-	mov	Temp1, A
-	mov	A, Temp2
-	rlc	A
-	mov	Temp2, A
+	// Shift to 11 bits
+	Temp1 = Temp1<<1;
+	Temp2 = Temp2<<1;
 #ENDIF
 }
 
@@ -1175,55 +1207,70 @@ void scale_throttle_cal()
 void find_throttle_gains()
 {
 	// Check if full range is chosen
-	if(!Flags2.RCP_FULL_RANGE) find_throttle_gains_normal
-
-	Temp3 = 0;		// Min throttle
-	Temp4 = 0;
-	Temp5 = 255;	// Max throttle
-	Temp6 = 0;
-	Temp7 = 0;		// Deadband
-	call	find_throttle_gain
+	if(Flags2.RCP_FULL_RANGE)
+	{
+	//Temp3 = 0;		// Min throttle
+	//Temp4 = 0;
+	Min_throttle = 0;
+	//Temp5 = 255;	// Max throttle
+	//Temp6 = 0;
+	Max_throttle = 255;
+	//Temp7 = 0;		// Deadband
+	Deadband = 0;
+	find_throttle_gain();
 	Throttle_Gain_M = Temp4;
 	Throttle_Gain = Temp3;
 	return;
-
-find_throttle_gains_normal:
+	}
+//find_throttle_gains_normal:
 	// Check if bidirectional operation
-	if(!Flags3.PGM_BIDIR) find_throttle_gains_bidir_done
-
-	Temp3 = Pgm_Min_Throttle;
-	Temp4 = 0;
-	Temp5 = Pgm_Center_Throttle;
-	Temp6 = 0;
-
-	Temp3 = Temp3<<1;			// Scale gains in bidirectional
-	Temp4 = Temp4<<1;
-	Temp5 = Temp5<<1;
-	Temp6 = Temp6<<1;
-	Temp7 = 10;		// Compensate for deadband in bidirectional
-	call	find_throttle_gain
+	if(Flags3.PGM_BIDIR)
+	{
+	//Temp3 = Pgm_Min_Throttle;
+	//Temp4 = 0;
+	//Temp5 = Pgm_Center_Throttle;
+	//Temp6 = 0;
+	Min_throttle = Pgm_Min_Throttle;
+	Max_throttle = Pgm_Center_Throttle;
+	
+	//Temp3 = Temp3<<1;			// Scale gains in bidirectional
+	//Temp4 = Temp4<<1;
+	Min_throttle = Min_throttle<<1;
+	//Temp5 = Temp5<<1;
+	//Temp6 = Temp6<<1;
+	Max_throttle = Max_throttle<<1;
+	//Temp7 = 10;		// Compensate for deadband in bidirectional
+	Deadband = 10;
+	
+	find_throttle_gain();
 	Throttle_Gain_BD_Rev_M = Temp4;
 	Throttle_Gain_BD_Rev = Temp3;
-
-find_throttle_gains_bidir_done:
-	if(Flags3.PGM_BIDIR) Temp3 = Pgm_Center_Throttle;
-	Temp3 = Pgm_Min_Throttle;
-
-	Temp4 = 0;
-	Temp5 = Pgm_Max_Throttle;
-	Temp6 = 0;
-	Temp7 = 0;			// No deadband
-	if(!Flags3.PGM_BIDIR) find_throttle_gain_fwd
-
-	Temp3 = Temp3<<1;// Scale gains in bidirectional
-	Temp4 = Temp4<<1;
-	Temp5 = Temp5<<1;
-	Temp6 = Temp6<<1;
-
-	Temp7 = 10;		// Compensate for deadband in bidirectional
-
-find_throttle_gain_fwd:
-	call	find_throttle_gain
+	}
+//find_throttle_gains_bidir_done:
+	if(Flags3.PGM_BIDIR) 
+	//Temp3 = Pgm_Center_Throttle;
+	//Temp3 = Pgm_Min_Throttle;
+	//Temp4 = 0;
+	Min_throttle = Pgm_Center_Throttle;
+	Min_throttle = Pgm_Min_Throttle;
+	//Temp5 = Pgm_Max_Throttle;
+	//Temp6 = 0;
+	Max_throttle = Pgm_Max_Throttle;
+	//Temp7 = 0;			// No deadband
+	deadband = 0;
+	if(Flags3.PGM_BIDIR)
+	{
+	//Temp3 = Temp3<<1;// Scale gains in bidirectional
+	//Temp4 = Temp4<<1;
+	Min_throttle = Min_throttle<<1;
+	//Temp5 = Temp5<<1;
+	//Temp6 = Temp6<<1;
+	Max_throttle = Max_throttle<<1;
+	//Temp7 = 10;		// Compensate for deadband in bidirectional
+	Deadband = 10;
+	}
+//find_throttle_gain_fwd:
+	find_throttle_gain();
 	Throttle_Gain_M = Temp4;
 	Throttle_Gain = Temp3;
 	return;
@@ -1239,46 +1286,63 @@ find_throttle_gain_fwd:
 // Finds throttle gain from throttle calibration values
 //
 //**** **** **** **** **** **** **** **** **** **** **** **** ****
-void find_throttle_gain()
+void find_throttle_gain(int min_throttle,int max_throttle,char deadband)
 {
 	// Subtract deadband from max
-	Temp5 = Temp5 - Temp7;
-	Temp6 = Temp6 - 0;
+	//Temp5 = Temp5 - Temp7;
+	//Temp6 = Temp6 - 0;
+	max_throttle -= deadband;
 	// Calculate difference
-	Temp5 = Temp5 - Temp3;
-	Temp6 = Temp6 - Temp4;
+	//Temp5 = Temp5 - Temp3;
+	//Temp6 = Temp6 - Temp4;
+	max_throttle -= min_throttle;
 	// Check that difference is minimum 35
-	if(Temp5 <= 35 || Temp6 <= 0)
+	if(max_throttle - min_throttle<35)max_throttle=35;//(Temp5 <= 35 || Temp6 <= 0)
 	{Temp5 = 35;
 	Temp6 = 0;}
 
 	// Check that difference is maximum 511
-	if(Temp5 >= 255 || Temp6 >= 1)
+	if(max_throttle - min_throttle>511)max_throttle=511;//(Temp5 >= 255 || Temp6 >= 1)
 	{Temp5 = 255;
 	Temp6 = 1;}
 
 	// Find gain
 	Temp4 = 0xFF;
-find_throttle_gain_loop:
+//find_throttle_gain_loop:
+	do
+	{
 	Temp4++;
 	Temp3 = 0;
-test_throttle_gain:
+//test_throttle_gain:
+	do
+	{
 	Temp3++;
-	if(Temp3)	test_throttle_gain_mult
-
-	Temp5 = Temp5<<1;			// Set multiplier x2 and range /2
-	Temp6 = Temp6<<1;
-	ajmp	find_throttle_gain_loop
-
-test_throttle_gain_mult:
-	Temp7 = Temp5*Temp3;// A has difference, B has gain
-	mov	A, Temp6
-	mov	B, Temp3
-	mul	AB
-	if(Temp7 + Temp6*Temp3 < 124) test_throttle_gain
-
-	if(!(~Temp3))	find_throttle_gain_loop
-
+//	jnz	test_throttle_gain_mult
+	if(Temp3==0)
+	{
+	// Set multiplier x2 and range /2
+	max_throttle = max_throttle<<1;
+	//ajmp	find_throttle_gain_loop
+	continue;
+	}
+//test_throttle_gain_mult:
+	//mov	A, Temp5			// A has difference, B has gain
+	//mov	B, Temp3
+	//mul	AB
+	//mov	Temp7, B
+	deadband = (Temp3*Temp5)>>8;
+	//mov	A, Temp6
+	//mov	B, Temp3
+	//mul	AB
+	//add	A, Temp7
+	//subb	A, #124
+	//jc	test_throttle_gain
+	}while(Temp6*Temp3 + deadband < 124)
+	//mov	A, Temp3
+	//cpl	A
+	//jz	find_throttle_gain_loop
+	if(Temp3 == 0xFF) continue;
+	}
 	return;
 }
 
@@ -1333,23 +1397,14 @@ average_throttle_div:
 //**** **** **** **** **** **** **** **** **** **** **** **** ****
 void led_control()
 {
-	Temp2 = Pgm_LED_Control;
-	if(Pgm_LED_Control&0x03) led_0_done
-	Clear_LED_0
-led_0_done:
+	Set_LED_0
+	if(!(Pgm_LED_Control&0x03)) Clear_LED_0
 	Set_LED_1
-	if(Pgm_LED_Control&0x0C) led_1_done
-	Clear_LED_1
-led_1_done:
+	if(!(Pgm_LED_Control&0x0C)) Clear_LED_1
 	Set_LED_2
-	if(Pgm_LED_Control&0x30) led_2_done
-	Clear_LED_2
-led_2_done:
+	if(!(Pgm_LED_Control&0x30)) Clear_LED_2
 	Set_LED_3
-	if(Pgm_LED_Control&0xC0) led_3_done
-	Clear_LED_3
-led_3_done:
-	return;
+	if(!(Pgm_LED_Control&0xC0)) Clear_LED_3
 }
 
 //**** **** **** **** **** **** **** **** **** **** **** **** ****
@@ -1404,7 +1459,7 @@ void pgm_start()
 	// Set default programmed parameters
 	call	set_default_parameters
 	// Read all programmed parameters
-	call read_all_eeprom_parameters
+	call read_all_eeprom_parameters //BLHeliPgm.inc
 	// Set beep strength
 	Beep_Strength = Pgm_Beep_Strength;
 	// Set initial arm variable
@@ -1433,29 +1488,36 @@ init_no_signal()
 	// Initialize flash keys to invalid values
 	Flash_Key_1 = 0;
 	Flash_Key_2 = 0;
+	if(RTX_PORT.RTX_PIN)
+	{
 	// Check if input signal is high for more than 15ms
-	Temp1 = 250;
-input_high_check_1:
-	Temp2 = 250;
-input_high_check_2:
-	if(!RTX_PORT.RTX_PIN) bootloader_done	// Look for low
-	djnz	Temp2, input_high_check_2
-	djnz	Temp1, input_high_check_1
-
-	ljmp	1C00h			// Jump to bootloader
-
-bootloader_done:
+	unsigned char i = 250,j = 250;
+	while(i--)
+	{
+		while(j--)
+		{
+			if(!RTX_PORT.RTX_PIN)// Look for low
+			{
+				i=0;
+				j=0;
+				break;
+			}
+		}
+	}
+	ljmp 1C00h			// Jump to bootloader
+	}
+//bootloader_done:
 	// Decode settings
-	call	decode_settings
+	decode_settings();
 	// Find throttle gain from stored min and max settings
-	call	find_throttle_gains
+	find_throttle_gains();
 	// Set beep strength
 	Beep_Strength = Pgm_Beep_Strength;
 	// Switch power off
-	call	switch_power_off
+	switch_power_off();
 	// Set clock frequency
 #IF MCU_48MHZ == 1
-	Set_MCU_Clk_24MHz
+	Set_MCU_Clk_24MHz();
 #ENDIF
 	// Setup timers for pwm input
 	IT01CF = RTX_PIN;	// Route RCP input to INT0
@@ -1464,10 +1526,10 @@ bootloader_done:
 	TMOD = 0x09;		// Timer 0 set to 16bits and gated by INT0
 	TMR2CN0 = 0x04;		// Timer 2 enabled
 	TMR3CN0 = 0x04;		// Timer 3 enabled
-	Initialize_PCA			// Initialize PCA
-	Set_Pwm_Polarity		// Set pwm polarity
-	Enable_Power_Pwm_Module	// Enable power pwm module
-	Enable_Damp_Pwm_Module	// Enable damping pwm module
+	Initialize_PCA();			// Initialize PCA
+	Set_Pwm_Polarity();		// Set pwm polarity
+	Enable_Power_Pwm_Module();	// Enable power pwm module
+	Enable_Damp_Pwm_Module();	// Enable damping pwm module
 	// Enable interrupts
 #IF MCU_48MHZ == 0
 	IE = 0x21;			// Enable timer 2 interrupts and INT0 interrupts
@@ -1477,9 +1539,9 @@ bootloader_done:
 	EIE1 = 0x90;		// Enable timer 3 and PCA0 interrupts
 	IP = 0x01;			// High priority to INT0 interrupts
 	// Initialize comparator
-	Initialize_Comparator	// Initialize comparator
+	Initialize_Comparator();	// Initialize comparator
 	// Initialize ADC
-	Initialize_Adc			// Initialize ADC operation
+	Initialize_Adc();			// Initialize ADC operation
 	call	wait1ms
 	IE_EA = 1;			// Enable all interrupts
 	// Reset stall count
@@ -1498,7 +1560,7 @@ bootloader_done:
 	Rcp_Outside_Range_Cnt = 0;		// Reset out of range counter
 	call wait100ms						// Wait for new RC pulse
 	if(Rcp_Outside_Range_Cnt < 10)			// Check how many pulses were outside normal range ("900-2235us")
-	ajmp	validate_rcp_start
+	validate_rcp_start;
 
 	// Test whether signal is OneShot125
 	Flags2.RCP_ONESHOT125 = 1;			// Set OneShot125 flag
@@ -1506,16 +1568,15 @@ bootloader_done:
 	call wait100ms						// Wait for new RC pulse
 
 	if(Rcp_Outside_Range_Cnt < 10)			// Check how many pulses were outside normal range ("900-2235us")
-	ajmp	validate_rcp_start
+	validate_rcp_start;
 
 	// Test whether signal is OneShot42
 	Flags2.RCP_ONESHOT125 = 0;
 	Flags2.RCP_ONESHOT42 = 1;			// Set OneShot42 flag
 	Rcp_Outside_Range_Cnt = 0;		// Reset out of range counter
 	call wait100ms						// Wait for new RC pulse
-	clr	C
 	if(Rcp_Outside_Range_Cnt < 10)			// Check how many pulses were outside normal range ("900-2235us")
-	ajmp	validate_rcp_start
+	validate_rcp_start;
 
 	// Setup timers for DShot
 	IT01CF = 0x80+(RTX_PIN << 4)+(RTX_PIN);	// Route RCP input to INT0/1, with INT1 inverted
@@ -2306,3 +2367,16 @@ reset:
 ljmp	pgm_start
 
 END
+
+
+
+
+
+
+
+
+
+
+
+
+
