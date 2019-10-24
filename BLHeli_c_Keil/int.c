@@ -369,24 +369,17 @@ int0_int_not_dshot:
 	rrc	A
 	add	A, Temp3		// Add 1/16 to 1/32
 	mov	Temp3, A
-	clr	C			// Multiply by 2
-	mov	A, Temp1
-	rlc	A
-	mov	Temp1, A
-	mov	A, Temp2
-	rlc	A
-	mov	Temp2, A
-	mov	A, Temp1		// Add 1/16 and 1/32
-	add	A, Temp3
-	mov	Temp3, A
-	mov	A, Temp2
+	// Multiply by 2
+	Temp1 = Temp1<<1;
+	Temp2 = Temp2<<1;
+	// Add 1/16 and 1/32
+	Temp3 = Temp1 + Temp3;
 #IF MCU_48MHZ == 0
-	addc	A, #03h		// Add to low end, to make signal look like 20-40us
+	Temp4 = Temp2 + 0x03;		// Add to low end, to make signal look like 20-40us
 #ELSE
-	addc	A, #06h
+	Temp4 = Temp2 + 0x06;
 #ENDIF
-	mov	Temp4, A
-	ajmp	int0_int_fall_gain_done
+	ajmp int0_int_fall_gain_done
 
 int0_int_fall_not_multishot:
 	if(!Flags2.RCP_ONESHOT42) int0_int_fall_not_oneshot_42
