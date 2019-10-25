@@ -63,15 +63,15 @@ void set_pwm_limit_high_rpm()
 	return;
 }
 
-;**** **** **** **** **** **** **** **** **** **** **** **** ****
-;
-; Check temperature, power supply voltage and limit power
-;
-; No assumptions
-;
-; Used to limit main motor power in order to maintain the required voltage
-;
-;**** **** **** **** **** **** **** **** **** **** **** **** ****
+//**** **** **** **** **** **** **** **** **** **** **** **** ****
+//
+// Check temperature, power supply voltage and limit power
+//
+// No assumptions
+//
+// Used to limit main motor power in order to maintain the required voltage
+//
+//**** **** **** **** **** **** **** **** **** **** **** **** ****
 void check_temp_voltage_and_limit_power()
 {
 	Adc_Conversion_Cnt++;			// Increment conversion counter
@@ -180,6 +180,7 @@ void initialize_timing()
 //
 //**** **** **** **** **** **** **** **** **** **** **** **** ****
 void calc_next_comm_timing()		// Entry point for run phase
+{
 	// Read commutation time
 	IE_EA = 0;
 	TMR2CN0_TR2 = 0;		// Timer 2 disabled
@@ -203,32 +204,34 @@ void calc_next_comm_timing()		// Entry point for run phase
 
 	Temp1 = Temp1 - Temp4;	// Calculate the new commutation time
 	A = Temp2 - Temp5;
-	if(Flags1.STARTUP_PHASE) calc_next_comm_startup
-
-IF MCU_48MHZ == 1
+	if(!Flags1.STARTUP_PHASE) //calc_next_comm_startup
+	{
+#IF MCU_48MHZ == 1
 	Temp2 = (Temp2 - Temp5)&0x7F;
-ENDIF
+#ENDIF
 	Temp2 = Temp2 - Temp5;
-	if(!Flags1.HIGH_RPM) calc_next_comm_normal	// Branch if high rpm
-	calc_next_comm_timing_fast
-	calc_next_comm_normal
-
-calc_next_comm_startup:
+	if(Flags1.HIGH_RPM) //ajmp calc_next_comm_normal	// Branch if high rpm
+		ajmp calc_next_comm_timing_fast
+	ajmp calc_next_comm_normal
+	}
+//calc_next_comm_startup:
 	Temp6 = Prev_Comm_X;
 	Prev_Comm_X = Temp3;		// Store extended timestamp as previous commutation
 	Temp2 = A;
 	A = Temp3 - Temp6;				// Calculate the new extended commutation time
-IF MCU_48MHZ == 1
+#IF MCU_48MHZ == 1
 	Temp3 = (Temp3 - Temp6)&0x7F;
-ENDIF
+#ENDIF
 	Temp3 = Temp3 - Temp6;
-	if(!A)calc_next_comm_startup_no_X
-
+	if(A!=0) //calc_next_comm_startup_no_X
+	{
 	Temp1 = 0xFF;
 	Temp2 = 0xFF;
-	calc_next_comm_startup_average
-
-calc_next_comm_startup_no_X:
+	//calc_next_comm_startup_average
+	}
+	else
+	{
+//calc_next_comm_startup_no_X:
 	Temp7 = Prev_Prev_Comm_L;
 	Temp8 = Prev_Prev_Comm_H;
 	Prev_Prev_Comm_L = Temp4;
@@ -238,18 +241,20 @@ calc_next_comm_startup_no_X:
 
 	Temp1 = Temp1 - Temp7;			// Calculate the new commutation time based upon the two last commutations (to reduce sensitivity to offset)
 	Temp2 = Temp2 - Temp8;
-
-calc_next_comm_startup_average:
+	}
+//calc_next_comm_startup_average:
 	Temp4 = Comm_Period4x_H >> 1;		// Average with previous and save
 	Temp3 = Comm_Period4x_L >> 1;
 
 	Comm_Period4x_L = Temp1 + Temp3;
 	Comm_Period4x_H = Temp2 + Temp4;
-	if(Comm_Period4x_L&0x01 == 0 || Comm_Period4x_H&0x01)
-		calc_new_wait_times_setup
+	//jnc	($+8)
+	if(Comm_Period4x_L&0x01 == 1 || Comm_Period4x_H&0x01==1)
+	{
 	Comm_Period4x_L = 0xFF;
 	Comm_Period4x_H = 0xFF;
-	calc_new_wait_times_setup
+	}
+	ajmp calc_new_wait_times_setup
 
 calc_next_comm_normal:
 	// Calculate new commutation time 
@@ -260,45 +265,50 @@ calc_next_comm_normal:
 	Temp7 = #4;				// Divide Comm_Period4x 4 times as default
 	Temp8 = #2;				// Divide new commutation time 2 times as default
 
-	if(Temp4 < 0x04)	calc_next_comm_avg_period_div;
+	if(Temp4 >= 0x04)	//calc_next_comm_avg_period_div;
+	{
 	Temp7--;				// Reduce averaging time constant for low speeds
 	Temp8--;
 
-	if(Temp4 < 0x08)	calc_next_comm_avg_period_div;
-
-	if(Flags1.INITIAL_RUN_PHASE) calc_next_comm_avg_period_div	// Do not average very fast during initial run
-	Temp7--;				// Reduce averaging time constant more for even lower speeds
-	Temp8--;
-
-calc_next_comm_avg_period_div:
+	if(Temp4 >= 0x08)	//calc_next_comm_avg_period_div;
+	{
+	if(!Flags1.INITIAL_RUN_PHASE) //calc_next_comm_avg_period_div	// Do not average very fast during initial run
+	{Temp7--;				// Reduce averaging time constant more for even lower speeds
+	Temp8--;}
+	}
+	}
+//calc_next_comm_avg_period_div:
+	do
+	{
 	Temp6 =	Temp6 >> 1;				// Divide by 2
 	Temp5 =	Temp5 >> 1;
-
-	if(Temp7--) calc_next_comm_avg_period_div
+	}while(Temp7--); //calc_next_comm_avg_period_div
 
 	Temp3 = Temp3 - Temp5;				// Subtract a fraction
 	Temp4 = Temp4 - Temp6;
 
-	if(!Temp8) calc_next_comm_new_period_div_done // Divide new time
-
-calc_next_comm_new_period_div:					
+	if(Temp8 != 0) //calc_next_comm_new_period_div_done // Divide new time
+	{
+//calc_next_comm_new_period_div:
+	do
+	{
 	Temp2 =	Temp2 >> 1;					// Divide by 2
 	Temp1 =	Temp1 >> 1;
-	if(Temp8--) calc_next_comm_new_period_div
-
-calc_next_comm_new_period_div_done:
+	}while(Temp8--); //calc_next_comm_new_period_div
+	}
+//calc_next_comm_new_period_div_done:
 	Temp3 = Temp1 + Temp3;				// Add the divided new time
 	Temp4 = Temp2 + Temp4;
 	
 	Comm_Period4x_L = Temp3;	// Store Comm_Period4x_X
 	Comm_Period4x_H = Temp4;
-	if(Temp2 + Temp4 < 0xFF)	calc_new_wait_times_setup	// If period larger than 0xffff - go to slow case
-
+	if(Temp2 + Temp4 > 0xFF)	//calc_new_wait_times_setup	// If period larger than 0xffff - go to slow case
+	{
 	Temp4 = 0xFF;
 	Comm_Period4x_L = Temp4;	// Set commutation period registers to very slow timing (0xffff)
 	Comm_Period4x_H = Temp4;
-
-calc_new_wait_times_setup:	
+	}
+//calc_new_wait_times_setup:	
 	// Set high rpm bit (if above 156k erpm)
 	mov	A, Temp4
 	subb	A, #2
@@ -336,14 +346,14 @@ calc_new_wait_per_demag_done:
 
 	Temp3 = Temp1 - Temp7;
 
-	Temp4 = Temp2;				
+	Temp4 = Temp2 - 0;
 
-	if(Temp1 < Temp7)	load_min_time			// Check that result is still positive
-
-	clr	C
-	if(Temp3 < 1 || Temp4 < 0)	calc_new_wait_times_exit	// Check that result is still above minumum
-
-load_min_time:
+	if(Temp1 < Temp7)	//load_min_time			// Check that result is still positive
+	{
+	//clr	C
+	if(Temp3 > 1 || Temp4 > 0)	//calc_new_wait_times_exit	// Check that result is still above minumum
+	}
+//load_min_time:
 	Temp3 = 1;
 	Temp4 = 0;
 
@@ -426,8 +436,8 @@ void calc_new_wait_times()
 	Temp1 = Temp1 << 1;				// Multiply by 2
 	Temp2 = Temp2 << 1;
 #ENDIF
-	if(Flags1.HIGH_RPM)	// Branch if high rpm
-		calc_new_wait_times_fast;
+	if(!Flags1.HIGH_RPM)	// Branch if high rpm
+	{	//calc_new_wait_times_fast;
 
 	Temp3 = Temp1;				// Copy values
 	Temp4 = Temp2;
@@ -437,21 +447,23 @@ void calc_new_wait_times()
 
 	Wt_Zc_Tout_Start_L = Temp1; //Set 15deg time for zero cross scan timeout
 	Wt_Zc_Tout_Start_H = Temp2;
-	clr	C
+	//clr	C
 	// (Temp8 has Pgm_Comm_Timing)
-	if(Temp8 == 3)				// Is timing normal?
-		store_times_decrease	// Yes - branch
+	if(Temp8 != 3)				// Is timing normal?
+	{	//store_times_decrease	// Yes - branch
 
-	if(Temp8&0x01)				
-		adjust_timing_two_steps	// If an odd number - branch
+	if(Temp8&0x01 == 0)				
+	{	//adjust_timing_two_steps	// If an odd number - branch
 
 	Temp1 = Temp1 + Temp5;				// Add 7.5deg and store in Temp1/2
 	Temp2 = Temp6 + Temp2;
 	Temp3 = Temp5;				// Store 7.5deg in Temp3/4
 	Temp4 = Temp6;
-	store_times_up_or_down
-
-adjust_timing_two_steps:
+	//store_times_up_or_down
+	}
+	else
+	{
+//adjust_timing_two_steps:
 	Temp1 = Temp1 << 1;				// Add 15deg and store in Temp1/2
 	Temp2 = Temp2 << 1;
 	
@@ -460,41 +472,42 @@ adjust_timing_two_steps:
 
 	Temp3 = -1;				// Store minimum time in Temp3/4
 	Temp4 = 0xFF;
-
-store_times_up_or_down:				
-	if(Temp8 <= 3)					// Is timing higher than normal?
-		store_times_decrease		// No - branch
-
-store_times_increase:
+	}
+//store_times_up_or_down:				
+	if(Temp8 > 3)					// Is timing higher than normal?
+	{	//store_times_decrease		// No - branch
+//store_times_increase:
 	Wt_Comm_Start_L = Temp3;		// Now commutation time (~60deg) divided by 4 (~15deg nominal)
 	Wt_Comm_Start_H = Temp4;
 	Wt_Adv_Start_L = Temp1;		// New commutation advance time (~15deg nominal)
 	Wt_Adv_Start_H = Temp2;
 	Wt_Zc_Scan_Start_L = Temp5;	// Use this value for zero cross scan delay (7.5deg)
 	Wt_Zc_Scan_Start_H = Temp6;
-	ljmp	wait_before_zc_scan;
-
-store_times_decrease:
+	wait_before_zc_scan();
+	}
+	}
+//store_times_decrease:
 	Wt_Comm_Start_L = Temp1		// Now commutation time (~60deg) divided by 4 (~15deg nominal)
 	Wt_Comm_Start_H = Temp2
 	Wt_Adv_Start_L = Temp3		// New commutation advance time (~15deg nominal)
 	Wt_Adv_Start_H = Temp4
 	Wt_Zc_Scan_Start_L = Temp5	// Use this value for zero cross scan delay (7.5deg)
 	Wt_Zc_Scan_Start_H = Temp6
-	if(!Flags1.STARTUP_PHASE) store_times_exit
-
+	if(Flags1.STARTUP_PHASE) //store_times_exit
+	{
 	Wt_Comm_Start_L = 0xF0;		// Set very short delays for all but advance time during startup, in order to widen zero cross capture range
 	Wt_Comm_Start_H = 0xFF;
 	Wt_Zc_Scan_Start_L = 0xF0;
 	Wt_Zc_Scan_Start_H = 0xFF;
 	Wt_Zc_Tout_Start_L = 0xF0;
 	Wt_Zc_Tout_Start_H = 0xFF;
-
-store_times_exit:
-	ljmp	wait_before_zc_scan
-
-
-calc_new_wait_times_fast:	
+	}
+//store_times_exit:
+	wait_before_zc_scan();
+	}
+	
+	
+//calc_new_wait_times_fast:	
 	Temp3 = Temp1;				// Copy values
 
 	// Negative numbers - set carry
@@ -503,31 +516,34 @@ calc_new_wait_times_fast:
 	Wt_Zc_Tout_Start_L = Temp1; // Set 15deg time for zero cross scan timeout
 
 	// (Temp8 has Pgm_Comm_Timing)
-	if(Temp8 == 3)				// Is timing normal?
-		store_times_decrease_fast// Yes - branch
+	if(Temp8 != 3)				// Is timing normal?
+	{	//store_times_decrease_fast// Yes - branch
 
-	if(Temp8&0x01)				
-		adjust_timing_two_steps_fast	// If an odd number - branch
+	if(Temp8&0x01==0)				
+	{	//adjust_timing_two_steps_fast	// If an odd number - branch
 	Temp1 = Temp1 + Temp5;				// Add 7.5deg and store in Temp1
 	Temp3 = Temp5;				// Store 7.5deg in Temp3
-	ajmp	store_times_up_or_down_fast
-
-adjust_timing_two_steps_fast:
+	//ajmp	store_times_up_or_down_fast
+	}
+	else
+	{
+//adjust_timing_two_steps_fast:
 	Temp1 = (Temp1 >> 1) + 1;				// Add 15deg and store in Temp1
 	Temp3 = -1;			// Store minimum time in Temp3
-
-store_times_up_or_down_fast:
+	}
+//store_times_up_or_down_fast:
 	mov	A, Temp8				
-	if(Temp8 < 3)				// Is timing higher than normal?
-		store_times_decrease_fast// No - branch
+	if(Temp8 >= 3)				// Is timing higher than normal?
+	{	//store_times_decrease_fast// No - branch
 
-store_times_increase_fast:
+//store_times_increase_fast:
 	Wt_Comm_Start_L = Temp3;		// Now commutation time (~60deg) divided by 4 (~15deg nominal)
 	Wt_Adv_Start_L = Temp1;		// New commutation advance time (~15deg nominal)
 	Wt_Zc_Scan_Start_L = Temp5;	// Use this value for zero cross scan delay (7.5deg)
-	ljmp	wait_before_zc_scan
-
-store_times_decrease_fast:
+	wait_before_zc_scan();
+	}
+	}
+//store_times_decrease_fast:
 	Wt_Comm_Start_L = Temp1;		// Now commutation time (~60deg) divided by 4 (~15deg nominal)
 	Wt_Adv_Start_L = Temp3;		// New commutation advance time (~15deg nominal)
 	Wt_Zc_Scan_Start_L = Temp5;	// Use this value for zero cross scan delay (7.5deg)
@@ -598,23 +614,25 @@ void wait_for_comp_out_low()
 	Comparator_Read_Cnt = 0;		// Reset number of comparator reads
 	Bit_Access = 0x00;			// Desired comparator output
 	if(Flags1.DIR_CHANGE_BRAKE)
-		Bit_Access = 0x40;		
-	wait_for_comp_out_start
+	{Bit_Access = 0x40;}
+	else
+	{
+	//wait_for_comp_out_start
 
-wait_for_comp_out_high:
+//wait_for_comp_out_high:
 	Flags0.DEMAG_DETECTED = 1;		// Set demag detected flag as default
 	Comparator_Read_Cnt = 0;		// Reset number of comparator reads
 	Bit_Access = 0x40;				// Desired comparator output
 	if(Flags1.DIR_CHANGE_BRAKE)
 		Bit_Access = 0x00;
-
-wait_for_comp_out_start:
+	}
+//wait_for_comp_out_start:
 	// Set number of comparator readings
 	Temp1 = 1;					// Number of OK readings required
 	Temp2 = 1;					// Max number of readings required
-	if(Flags1.HIGH_RPM) comp_scale_samples	// Branch if high rpm
-
-	mov	A, Flags1					// Clear demag detected flag if start phases
+	if(!Flags1.HIGH_RPM) //comp_scale_samples	// Branch if high rpm
+	{
+	//mov	A, Flags1					// Clear demag detected flag if start phases
 	if(Flags1 & ((1 << STARTUP_PHASE)+(1 << INITIAL_RUN_PHASE)))
 		Flags0.DEMAG_DETECTED = 0;
 
@@ -626,11 +644,11 @@ wait_for_comp_out_start:
 	if(Comm_Period4x_H > 20)
 		Temp1 = 0x20;
 	
-	if(!Flags1.STARTUP_PHASE) comp_scale_samples
-	Temp1 = 0x27;				// Set many samples during startup, approximately one pwm period
-	Temp2 = 0x27;
-
-comp_scale_samples:
+	if(Flags1.STARTUP_PHASE) //comp_scale_samples
+	{Temp1 = 0x27;				// Set many samples during startup, approximately one pwm period
+	Temp2 = 0x27;}
+	}
+//comp_scale_samples:
 #IF MCU_48MHZ == 1
 	Temp1 = Temp1 << 1;
 	Temp2 = Temp2 << 1;
@@ -650,14 +668,14 @@ comp_check_timeout_timeout_extended:
 	ajmp	setup_comm_wait
 
 comp_check_timeout_extend_timeout:
-	call	setup_zc_scan_timeout
+	setup_zc_scan_timeout();
 comp_check_timeout_not_timed_out:
 	Comparator_Read_Cnt++;			// Increment comparator read count
 	CMP0CN0 = CMP0CN0&0x40;					// Read comparator output
-	if(CMP0CN0 != Bit_Access) comp_read_wrong
-	ajmp	comp_read_ok
-	
-comp_read_wrong:
+	if(CMP0CN0 != Bit_Access) //comp_read_wrong
+	//ajmp	comp_read_ok
+	{
+//comp_read_wrong:
 	if(!Flags1.STARTUP_PHASE) comp_read_wrong_not_startup
 
 	Temp1++;					// Increment number of OK readings required
@@ -713,8 +731,8 @@ comp_read_wrong_load_timeout:
 	TMR3L = 0;
 	TMR3H = 255-Temp7;
 	comp_read_wrong_timeout_set
-
-comp_read_ok:
+	}
+//comp_read_ok:
 	clr	C
 	if(Startup_Cnt < 1)				// Force a timeout for the first commutation
 		wait_for_comp_out_start
@@ -801,15 +819,15 @@ void wait_for_comm()
 	if(Demag_Detected_Metric < 120)				// Limit to minimum 120
 		Demag_Detected_Metric = 120;
 
-	if(Demag_Detected_Metric < Demag_Pwr_Off_Thresh)	// Check demag metric
-		wait_for_comm_wait		// Cut power if many consecutive demags. This will help retain sync during hard accelerations
+	if(Demag_Detected_Metric >= Demag_Pwr_Off_Thresh)	// Check demag metric
+	{	//wait_for_comm_wait		// Cut power if many consecutive demags. This will help retain sync during hard accelerations
 
 	All_pwmFETs_off
 	Set_Pwms_Off
-
+	}
 wait_for_comm_wait:
-	if(Flags0.T3_PENDING)
-		wait_for_comm_wait
+	while(Flags0.T3_PENDING);
+		//wait_for_comm_wait
 
 	// Setup next wait time
 	TMR3RLL = Wt_Zc_Scan_Start_L;
