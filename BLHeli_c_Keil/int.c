@@ -42,11 +42,11 @@ void t1_int()
 	// Divide by 2 (or 4 for 48MHz). Unit is then us
 	Temp2 = Temp2>>1;
 	Temp1 = Temp1>>1;
-	if(!Clock_Set_At_48MHz)	t1_int_frame_time_scaled
-	Temp2 = Temp2>>1;
-	Temp1 = Temp1>>1;
-
-t1_int_frame_time_scaled:
+	if(Clock_Set_At_48MHz)
+	{
+		Temp2 = Temp2>>1;
+		Temp1 = Temp1>>1;
+	}
 	if(Temp2) t1_int_msb_fail	// Frame too long
 	if(Temp1 < DShot_Frame_Length_Thr) t1_int_msb_fail	// Frame too short
 	if(Temp1 >= 2*DShot_Frame_Length_Thr) t1_int_msb_fail	// Frame too long
@@ -62,11 +62,11 @@ t1_int_frame_time_scaled:
 	Temp2 = 8;			// Number of bits per byte
 	DPTR = 0;			// Set pointer
 	Temp1 = DShot_Pwm_Thr;// DShot pulse width criteria
-	if(Clock_Set_At_48MHz)t1_int_decode
+	if(!Clock_Set_At_48MHz)
+	{
+		Temp1 = Temp1>>1;			// Scale pulse width criteria
+	}
 
-	Temp1 = Temp1>>1;			// Scale pulse width criteria
-
-t1_int_decode:
 	ajmp	t1_int_decode_msb
 
 t1_int_msb_fail:
@@ -107,14 +107,15 @@ t1_int_decode_lsb:
 	anl	A, #0F0h
 	clr	C
 	subb	A, Temp2
-	jz	t1_int_xor_ok		// XOR check
-
-	DPTR = 0;		 	// Set pointer to start
-	IE_EX0 = 1;			// Enable int0 interrupts
-	IE_EX1 = 1;			// Enable int1 interrupts
-	ajmp int0_int_outside_range
-
-t1_int_xor_ok:
+	//jz	t1_int_xor_ok		// XOR check
+	if(!Temp2)
+	{
+		DPTR = 0;		 	// Set pointer to start
+		IE_EX0 = 1;			// Enable int0 interrupts
+		IE_EX1 = 1;			// Enable int1 interrupts
+		ajmp int0_int_outside_range
+	}
+//t1_int_xor_ok:
 	// Swap to be LSB aligned to 12 bits (and invert)
 	mov	A, Temp4
 	cpl	A
@@ -136,61 +137,66 @@ t1_int_xor_ok:
 	Temp2 = Temp3;
 	Temp3 = Temp3 - 96;
 	Temp4 = Temp4 - 0;
-	if(Temp2 > 96) t1_normal_range
+	if(Temp2 < 96) //t1_normal_range
+	{
+		mov	A, Temp2  		// Check for 0 or dshot command
+		Temp4 = 0;
+		Temp3 = 0;
+		Temp2 = 0;
+		if(Temp2!=0) 	//t1_normal_range
+		{
+		// We are in the special dshot range
+		// Divide by 2
+			if(Temp2&0x01 == 0) //t1_dshot_set_cmd 	// Check for tlm bit set (if not telemetry, Temp2 will be zero and result in invalid command)
+			{
+				Temp2 = Temp2>>1;
 
-	mov	A, Temp2  		// Check for 0 or dshot command
-	Temp4 = 0;
-	Temp3 = 0;
-	Temp2 = 0;
-	if(!Temp2) 	t1_normal_range
-	
-	// We are in the special dshot range
-	// Divide by 2
-	if(!(Temp2&0x01)) t1_dshot_set_cmd 	// Check for tlm bit set (if not telemetry, Temp2 will be zero and result in invalid command)
-
-	Temp2 = Temp2>>1;
-
-	subb A, Dshot_Cmd
-	if(Temp2 == Dshot_Cmd) 	t1_dshot_inc_cmd_cnt
-
-t1_dshot_set_cmd:
-	mov A, Temp2
-	Dshot_Cmd = Temp2;
-	Dshot_Cmd_Cnt = 0;
-	Temp2 = 0;
-	jmp t1_normal_range
-	
-t1_dshot_inc_cmd_cnt:
-	Dshot_Cmd_Cnt++;
-	
-t1_normal_range:
+			//subb A, Dshot_Cmd
+			//t1_dshot_inc_cmd_cnt
+			}
+		//t1_dshot_set_cmd:
+			if(Temp2 != Dshot_Cmd)
+			{
+			//mov A, Temp2
+				Dshot_Cmd = Temp2;
+				Dshot_Cmd_Cnt = 0;
+				Temp2 = 0;
+			//jmp t1_normal_range
+			}
+		//t1_dshot_inc_cmd_cnt:
+			else
+			{
+				Dshot_Cmd_Cnt++;
+			}
+		}
+	}
+//t1_normal_range:
 	// Check for bidirectional operation (0=stop, 96-2095->fwd, 2096-4095->rev)
-	if(!Flags3.PGM_BIDIR) t1_int_not_bidir	// If not bidirectional operation - branch
-
+	if(Flags3.PGM_BIDIR) //t1_int_not_bidir	// If not bidirectional operation - branch
+	{
 	// Subtract 2000 (still 12 bits)
 	Temp1 = Temp3 - 0xD0;
 	Temp2 = Temp4 - 0x07;
-	if(Temp3 < 0xD0 || Temp4 - 0x07) t1_int_bidir_fwd				// If result is negative - branch
-
+	if(Temp3 >= 0xD0 || Temp4 >= 0x07) //t1_int_bidir_fwd				// If result is negative - branch
+	{
 	Temp3 = Temp1;
 	Temp4 = Temp2;
-	if(Flags2.RCP_DIR_REV) t1_int_bidir_rev_chk	// If same direction - branch
-
-	Flags2.RCP_DIR_REV = 1;
+	if(!Flags2.RCP_DIR_REV) //t1_int_bidir_rev_chk	// If same direction - branch
+		Flags2.RCP_DIR_REV = 1;
 	ajmp t1_int_bidir_rev_chk
-
-t1_int_bidir_fwd:
-	if(!Flags2.RCP_DIR_REV) t1_int_bidir_rev_chk	// If same direction - branch
+	}
+//t1_int_bidir_fwd:
+	if(Flags2.RCP_DIR_REV) //t1_int_bidir_rev_chk	// If same direction - branch
 	Flags2.RCP_DIR_REV = 0;
 
-t1_int_bidir_rev_chk:
+//t1_int_bidir_rev_chk:
 	if(!Flags3.PGM_BIDIR_REV)
-
 	Flags2.RCP_DIR_REV = ~Flags2.RCP_DIR_REV;
 
 	// Multiply throttle value by 2
 	Temp3 = Temp3<<1;
 	Temp4 = Temp4<<1;
+	}
 t1_int_not_bidir:
 	// Generate 4/256
 	Temp2 = Temp4 << 2;
@@ -208,29 +214,29 @@ t1_int_not_bidir:
 	Temp4 = 0xFF;
 	}
 	// Boost pwm during direct start
-	mov	A, Flags1
-	if(!(Flags1&((1 << STARTUP_PHASE)+(1 << INITIAL_RUN_PHASE)))) t1_int_startup_boosted
-
-	if(Flags1.MOTOR_STARTED) t1_int_startup_boosted	// Do not boost when changing direction in bidirectional mode
-
-	// Set 25% of max startup power as minimum power
-	Temp2 = Pwm_Limit_Beg << 1;
-	if(Temp4) t1_int_startup_boost_stall
-
-	if(Temp2 < Temp3) t1_int_startup_boost_stall
-
-	Temp3 = Temp2;
-
-t1_int_startup_boost_stall:
-	mov	A, Stall_Cnt					// Add an extra power boost during start
-	swap	A
-	rlc	A
-	add	A, Temp3
-	mov	Temp3, A
-	mov	A, Temp4
-	addc	A, #0
-	mov	Temp4, A
-
+	//mov	A, Flags1
+	if(Flags1&((1 << STARTUP_PHASE)+(1 << INITIAL_RUN_PHASE))) //t1_int_startup_boosted
+	{
+		if(!Flags1.MOTOR_STARTED) //t1_int_startup_boosted	// Do not boost when changing direction in bidirectional mode
+		{
+			// Set 25% of max startup power as minimum power
+			Temp2 = Pwm_Limit_Beg << 1;
+			if(Temp4==0) //t1_int_startup_boost_stall
+			{
+				if(Temp2 >= Temp3) //t1_int_startup_boost_stall
+					Temp3 = Temp2;
+			}
+		//t1_int_startup_boost_stall:
+			mov	A, Stall_Cnt					// Add an extra power boost during start
+			swap	A
+			rlc	A
+			add	A, Temp3
+			mov	Temp3, A
+			mov	A, Temp4
+			addc	A, #0
+			mov	Temp4, A
+		}
+	}
 t1_int_startup_boosted:
 	// Set 8bit value
 	clr	C
@@ -333,18 +339,18 @@ void t3_int()
 //**** **** **** **** **** **** **** **** **** **** **** **** ****
 int0_int()	// Used for RC pulse timing
 {
-	mov	A, TL0			// Read pwm for DShot immediately
+	//mov	A, TL0			// Read pwm for DShot immediately
 	// Test for DShot
-	if(!Flags2.RCP_DSHOT) int0_int_not_dshot
-
+	if(Flags2.RCP_DSHOT) //int0_int_not_dshot
+	{
 	TL1 = DShot_Timer_Preset;	// Reset sync timer
 	movx	@DPTR, A			// Store pwm
 	inc	DPTR
 	pop	ACC
-	reti
-
+	return;
+	}
 	// Not DShot
-int0_int_not_dshot:
+//int0_int_not_dshot:
 	IE_EA = 0;
 	EIE1 &= 0xEF;		// Disable pca interrupts
 	// Preserve registers through interrupt
@@ -353,118 +359,124 @@ int0_int_not_dshot:
 	// Get the counter values
 	Get_Rcp_Capture_Values
 	// Scale down to 10 bits (for 24MHz, and 11 bits for 48MHz)
-	if(!Flags2.RCP_MULTISHOT) int0_int_fall_not_multishot
-
+	if(Flags2.RCP_MULTISHOT) //int0_int_fall_not_multishot
+	{
 	// Multishot - Multiply by 2 and add 1/16 and 1/32
-	mov	A, Temp1		// Divide by 16
-	swap A
-	anl	A, #0Fh
-	mov	Temp3, A
-	mov	A, Temp2
-	swap	A
-	anl	A, #0F0h
-	orl	A, Temp3
-	mov	Temp3, A
-	clr	C			// Make divided by 32
-	rrc	A
-	add	A, Temp3		// Add 1/16 to 1/32
-	mov	Temp3, A
-	// Multiply by 2
-	Temp1 = Temp1<<1;
-	Temp2 = Temp2<<1;
-	// Add 1/16 and 1/32
-	Temp3 = Temp1 + Temp3;
-#IF MCU_48MHZ == 0
-	Temp4 = Temp2 + 0x03;		// Add to low end, to make signal look like 20-40us
-#ELSE
-	Temp4 = Temp2 + 0x06;
-#ENDIF
-	ajmp int0_int_fall_gain_done
+		mov	A, Temp1		// Divide by 16
+		swap A
+		anl	A, #0Fh
+		mov	Temp3, A
+		mov	A, Temp2
+		swap	A
+		anl	A, #0F0h
+		orl	A, Temp3
+		mov	Temp3, A
+		clr	C			// Make divided by 32
+		rrc	A
+		add	A, Temp3		// Add 1/16 to 1/32
+		mov	Temp3, A
+		// Multiply by 2
+		Temp1 = Temp1<<1;
+		Temp2 = Temp2<<1;
+		// Add 1/16 and 1/32
+		Temp3 = Temp1 + Temp3;
+	#IF MCU_48MHZ == 0
+		Temp4 = Temp2 + 0x03;		// Add to low end, to make signal look like 20-40us
+	#ELSE
+		Temp4 = Temp2 + 0x06;
+	#ENDIF
+		//ajmp int0_int_fall_gain_done
+	}
+	else
+	{
+//int0_int_fall_not_multishot:
+		if(Flags2.RCP_ONESHOT42) //int0_int_fall_not_oneshot_42
+		{
+			// Oneshot42 - Add 2/256
+			Temp1 = Temp1 << 1;
+			Temp3 = Temp2 << 1;
 
-int0_int_fall_not_multishot:
-	if(!Flags2.RCP_ONESHOT42) int0_int_fall_not_oneshot_42
-
-	// Oneshot42 - Add 2/256
-	Temp1 = Temp1 << 1;
-	Temp3 = Temp2 << 1;
-
-	Temp3 = Temp1 + Temp3;
-	Temp4 = Temp2 + 0;
-	ajmp	int0_int_fall_gain_done
-
-int0_int_fall_not_oneshot_42:
-	if(!Flags2.RCP_ONESHOT125) int0_int_fall_not_oneshot_125
-
-	// Oneshot125 - multiply by 86/256
-	mov	A, Temp1		// Multiply by 86 and divide by 256
-	mov	B, #56h
-	mul	AB
-	mov	Temp3, B
-	mov	A, Temp2
-	mov	B, #56h
-	mul	AB
-	add	A, Temp3
-	mov	Temp3, A
-	xch	A, B
-	addc	A, #0
-	mov	Temp4, A
-	ajmp	int0_int_fall_gain_done
-
-int0_int_fall_not_oneshot_125:
-	// Regular signal - multiply by 43/1024
-#IF MCU_48MHZ == 1
-	Temp3 = Temp3 >> 1;		// Divide by 2
-	Temp2 = Temp2 >> 1;
-	Temp1 = Temp1 >> 1;
-#ENDIF
-	mov	A, Temp1		// Multiply by 43 and divide by 1024
-#IF MCU_48MHZ == 0
-	mov	B, #2Bh
-#ELSE
-	mov	B, #56h		// Multiply by 86
-#ENDIF
-	mul	AB
-	mov	Temp3, B
-	mov	A, Temp2
-#IF MCU_48MHZ == 0
-	mov	B, #2Bh
-#ELSE
-	mov	B, #56h		// Multiply by 86
-#ENDIF
-	mul	AB
-	add	A, Temp3
-	mov	Temp3, A
-	xch	A, B
-	addc	A, #0
-	clr	C	
-	rrc	A			// Divide by 2 for total 512
-	mov	Temp4, A
-	mov	A, Temp3
-	rrc	A
-	mov	Temp3, A
-	clr	C
-	mov	A, Temp4		// Divide by 2 for total 1024
-	rrc	A						
-	mov	Temp4, A
-	mov	A, Temp3
-	rrc	A
-	mov	Temp3, A
-
-int0_int_fall_gain_done:
+			Temp3 = Temp1 + Temp3;
+			Temp4 = Temp2 + 0;
+			//ajmp	int0_int_fall_gain_done
+		}
+		else
+		{
+	//int0_int_fall_not_oneshot_42:
+			if(Flags2.RCP_ONESHOT125) //int0_int_fall_not_oneshot_125
+			{
+				// Oneshot125 - multiply by 86/256
+				mov	A, Temp1		// Multiply by 86 and divide by 256
+				mov	B, #56h
+				mul	AB
+				mov	Temp3, B
+				mov	A, Temp2
+				mov	B, #56h
+				mul	AB
+				add	A, Temp3
+				mov	Temp3, A
+				xch	A, B
+				addc	A, #0
+				mov	Temp4, A
+				//ajmp	int0_int_fall_gain_done
+			}
+			else
+			{
+			//int0_int_fall_not_oneshot_125:
+				// Regular signal - multiply by 43/1024
+			#IF MCU_48MHZ == 1
+				Temp3 = Temp3 >> 1;		// Divide by 2
+				Temp2 = Temp2 >> 1;
+				Temp1 = Temp1 >> 1;
+			#ENDIF
+				mov	A, Temp1		// Multiply by 43 and divide by 1024
+			#IF MCU_48MHZ == 0
+				mov	B, #2Bh
+			#ELSE
+				mov	B, #56h		// Multiply by 86
+			#ENDIF
+				mul	AB
+				mov	Temp3, B
+				mov	A, Temp2
+			#IF MCU_48MHZ == 0
+				mov	B, #2Bh
+			#ELSE
+				mov	B, #56h		// Multiply by 86
+			#ENDIF
+				mul	AB
+				add	A, Temp3
+				mov	Temp3, A
+				xch	A, B
+				addc	A, #0
+				clr	C	
+				rrc	A			// Divide by 2 for total 512
+				mov	Temp4, A
+				mov	A, Temp3
+				rrc	A
+				mov	Temp3, A
+				clr	C
+				mov	A, Temp4		// Divide by 2 for total 1024
+				rrc	A						
+				mov	Temp4, A
+				mov	A, Temp3
+				rrc	A
+				mov	Temp3, A
+			}
+		}
+	}
+//int0_int_fall_gain_done:
 	// Check if 2235us or above (in order to ignore false pulses)
 	mov	A, Temp4						// Is pulse 2235us or higher?
 #IF MCU_48MHZ == 0
 	if(Temp4 > 0x09) int0_int_outside_range// Yes - ignore pulse
-#ELSE
-	if(Temp4 > 0x12) int0_int_outside_range// Yes - ignore pulse
-#ENDIF
-
 	// Check if below 900us (in order to ignore false pulses)
-#IF MCU_48MHZ == 0
 	if(Temp3 >= 0x9A && Temp4 >= 0x03)	int0_int_check_full_range		// No - proceed
 #ELSE
+	if(Temp4 > 0x12) int0_int_outside_range// Yes - ignore pulse
+	// Check if below 900us (in order to ignore false pulses)
 	if(Temp3 >= 0x34 && Temp4 >= 0x07)	int0_int_check_full_range		// No - proceed
 #ENDIF
+
 
 int0_int_outside_range:
 	Rcp_Outside_Range_Cnt++;
@@ -483,44 +495,50 @@ int0_int_check_full_range:
 	Rcp_Outside_Range_Cnt--;
 
 	// Calculate "1000us" plus throttle minimum
-	if(!Flags2.RCP_FULL_RANGE) int0_int_set_min	// Check if full range is chosen
-
+	if(Flags2.RCP_FULL_RANGE) //int0_int_set_min	// Check if full range is chosen
+	{
 	Temp5 = 0;						// Set 1000us as default minimum
 #IF MCU_48MHZ == 0
 	Temp6 = 4;
 #ELSE
 	Temp6 = 8;
 #ENDIF
-	ajmp int0_int_calculate
-
-int0_int_set_min:
+	//ajmp int0_int_calculate
+	}
+	else
+	{
+//int0_int_set_min:
 	Temp5 = Min_Throttle_L;			// Min throttle value scaled
 	Temp6 = Min_Throttle_H;
 	if(!Flags3.PGM_BIDIR)
 	{Temp5 = Center_Throttle_L;			// Center throttle value scaled
 	Temp6 = Center_Throttle_H;}
-
-int0_int_calculate:
+	}
+//int0_int_calculate:
 	Temp3 = Temp3 - Temp5;						// Subtract minimum
 	Temp4 = Temp4 - Temp6;
 	mov	Bit_Access_Int.0, C
 	Temp7 = Throttle_Gain;				// Load Temp7/Temp8 with throttle gain
 	Temp8 = Throttle_Gain_M;
-	if(!Flags3.PGM_BIDIR) int0_int_not_bidir	// If not bidirectional operation - branch
+	if(Flags3.PGM_BIDIR) //int0_int_not_bidir	// If not bidirectional operation - branch
+	{
+	if(Temp3>0&&Temp4>0)//int0_int_bidir_fwd					// If result is positive - branch
+	{
+		if(Flags2.RCP_DIR_REV) //int0_int_bidir_rev_chk	// If same direction - branch
+			Flags2.RCP_DIR_REV = 0;
+	}
+	else
+	{
+		if(!Flags2.RCP_DIR_REV) //int0_int_bidir_rev_chk	// If same direction - branch
+			Flags2.RCP_DIR_REV = 1;
+	//ajmp int0_int_bidir_rev_chk
+	}
+	
+//int0_int_bidir_fwd:
+	//if(Flags2.RCP_DIR_REV) //int0_int_bidir_rev_chk	// If same direction - branch
+		//Flags2.RCP_DIR_REV = 0;
 
-	if(Temp3>0&&Temp4>0)int0_int_bidir_fwd					// If result is positive - branch
-
-	if(Flags2.RCP_DIR_REV) int0_int_bidir_rev_chk	// If same direction - branch
-
-	Flags2.RCP_DIR_REV = 1;
-	ajmp int0_int_bidir_rev_chk
-
-int0_int_bidir_fwd:
-	if(!Flags2.RCP_DIR_REV) int0_int_bidir_rev_chk	// If same direction - branch
-
-	Flags2.RCP_DIR_REV = 0;
-
-int0_int_bidir_rev_chk:
+//int0_int_bidir_rev_chk:
 	if(Flags2.RCP_DIR_REV)
 	{
 	Temp7 = Throttle_Gain_BD_Rev;		// Load Temp7/Temp8 with throttle gain for bidirectional reverse
@@ -531,13 +549,13 @@ int0_int_bidir_rev_chk:
 	// Multiply throttle value by 2
 	Temp3 = Temp3<<1;
 	Temp4 = Temp4<<1;
-	mov	C, Bit_Access_Int.0
-	jnc	int0_int_bidir_do_deadband		// If result is positive - branch
+	//mov	C, Bit_Access_Int.0
+	//jnc	int0_int_bidir_do_deadband		// If result is positive - branch
+	if(Bit_Access_Int.0)
+	{Temp3 = ~Temp3 + 1;						// Change sign
+	Temp4 = ~Temp4 + 1;}
 
-	Temp3 = ~Temp3 + 1;						// Change sign
-	Temp4 = ~Temp4 + 1;
-
-int0_int_bidir_do_deadband:
+//int0_int_bidir_do_deadband:
 	// Subtract deadband
 	mov	A, Temp3
 #IF MCU_48MHZ == 0
@@ -546,43 +564,45 @@ int0_int_bidir_do_deadband:
 	Temp3 = Temp3 - 0x80;
 #ENDIF
 	Temp4 = Temp4 - 0x00;
-	jnc	int0_int_do_throttle_gain
-
+	//jnc	int0_int_do_throttle_gain
+	if(Temp4 < 0x00 || Temp3 < 0x40 || Temp3 < 0x80)
+	{
 	Temp1 = 0x00;
 	Temp3 = 0x00;
 	Temp4 = 0x00;
 	ajmp	int0_int_do_throttle_gain
-
-int0_int_not_bidir:
-	mov	C, Bit_Access_Int.0
-	jnc	int0_int_do_throttle_gain		// If result is positive - branch
-
-int0_int_unidir_neg:
+	}
+	}
+//int0_int_not_bidir:
+	//mov	C, Bit_Access_Int.0
+	//jnc	int0_int_do_throttle_gain		// If result is positive - branch
+	if(Bit_Access_Int.0)
+	{
+//int0_int_unidir_neg:
 	// Yes - set to minimum
 	Temp1 = 0x00;
 	Temp3 = 0x00;
 	Temp4 = 0x00;
 	ajmp	int0_int_pulse_ready
-
+	}
 int0_int_do_throttle_gain:
 	// Boost pwm during direct start
-	if(!(Flags1&((1 << STARTUP_PHASE)+(1 << INITIAL_RUN_PHASE))))
-	int0_int_startup_boosted
+	if(Flags1&((1 << STARTUP_PHASE)+(1 << INITIAL_RUN_PHASE)))
+	{//int0_int_startup_boosted
 
-	if(Flags1.MOTOR_STARTED) int0_int_startup_boosted	// Do not boost when changing direction in bidirectional mode
-
+	if(Flags1.MOTOR_STARTED) //int0_int_startup_boosted	// Do not boost when changing direction in bidirectional mode
+	{
 	// Set 25% of max startup power as minimum power
 #IF MCU_48MHZ == 1
 	Temp2 = Pwm_Limit_Beg << 1;
 #ENDIF
 	Temp2 = Pwm_Limit_Beg;
-	if(Temp4) int0_int_startup_boost_stall
-
-	if(Temp2<=Temp3) int0_int_startup_boost_stall
-
-	Temp3 = Temp2;
-
-int0_int_startup_boost_stall:
+	if(!Temp4) //int0_int_startup_boost_stall
+	{
+	if(Temp2>Temp3) //int0_int_startup_boost_stall
+		Temp3 = Temp2;
+	}
+//int0_int_startup_boost_stall:
 	mov	A, Stall_Cnt					// Add an extra power boost during start
 	swap	A
 #IF MCU_48MHZ == 1
@@ -593,13 +613,15 @@ int0_int_startup_boost_stall:
 	mov	A, Temp4
 	addc	A, #0
 	mov	Temp4, A
-
-int0_int_startup_boosted:
-	mov	A, Temp3						// Multiply throttle value by throttle gain
-	mov	B, Temp7						// Temp7 has Throttle_Gain
-	mul	AB
-	mov	Temp2, A
-	mov	Temp3, B
+	}
+	}
+//int0_int_startup_boosted:
+	//mov	A, Temp3						// Multiply throttle value by throttle gain
+	//mov	B, Temp7						// Temp7 has Throttle_Gain
+	//mul	AB
+	//mov	Temp2, A
+	//mov	Temp3, B
+	Temp3Temp2 = Temp3*Temp7;
 	mov	A, Temp4
 	mov	B, Temp7						// Temp7 has Throttle_Gain
 	mul	AB
@@ -616,116 +638,140 @@ int0_int_startup_boosted:
 	rrc	A
 	mov	Temp1, A
 #IF MCU_48MHZ == 1
-	clr	C
-	mov	A, Temp6
-	rrc	A
-	mov	Temp6, A
-	mov	A, Temp1
-	rrc	A
-	mov	Temp1, A
+	//clr	C
+	//mov	A, Temp6
+	//rrc	A
+	//mov	Temp6, A
+	Temp6 = Temp6<<1;
+	//mov	A, Temp1
+	//rrc	A
+	//mov	Temp1, A
+	Temp1 = Temp1<<1;
 #ENDIF
 	inc	Temp8						// Temp8 has Throttle_Gain_M
-int0_int_gain_loop:
-	mov	A, Temp8
-	dec	A
-	jz	int0_int_gain_rcp_done			// Skip one multiply by 2 of New_Rcp
+//int0_int_gain_loop:
+	do
+	{
+	A = Temp8;
+	//dec	A
+	A--;
+	//jz	int0_int_gain_rcp_done			// Skip one multiply by 2 of New_Rcp
+	
+	//clr	C
+	//mov	A, Temp1						// Multiply New_Rcp by 2
+	//rlc	A
+	//mov	Temp1, A
+	if(A) Temp1 = Temp1<<1;
 
-	clr	C
-	mov	A, Temp1						// Multiply New_Rcp by 2
-	rlc	A
-	mov	Temp1, A
-
-int0_int_gain_rcp_done:
-	clr	C
-	mov	A, Temp2						// Multiply pwm by 2
-	rlc	A
-	mov	A, Temp3
-	rlc	A
-	mov	Temp3, A
-	mov	A, Temp4
-	rlc	A
-	mov	Temp4, A
-	djnz	Temp8, int0_int_gain_loop
-
-	mov	A, Temp4
+//int0_int_gain_rcp_done:
+	//clr	C
+	//mov	A, Temp2						// Multiply pwm by 2
+	//rlc	A
+	Temp2<<1;
+	//mov	A, Temp3
+	//rlc	A
+	//mov	Temp3, A
+	Temp3 = Temp3<<1;
+	//mov	A, Temp4
+	//rlc	A
+	//mov	Temp4, A
+	Temp4 = Temp4<<1;
+	//djnz	Temp8, int0_int_gain_loop
+	}while(Temp8--);
+	//mov	A, Temp4
 #IF MCU_48MHZ == 0
-	jnb	ACC.2, int0_int_pulse_ready		// Check that RC pulse is within legal range
+	if(Temp4&0x04) //int0_int_pulse_ready		// Check that RC pulse is within legal range
+	{
+	Temp1 = 0xFF;
+	Temp3 = 0xFF;
+	Temp4 = 3;
+	}
 #ELSE
-	jnb	ACC.3, int0_int_pulse_ready
+	if(Temp4&0x08) //int0_int_pulse_ready
+	{
+	Temp1 = 0xFF;
+	Temp3 = 0xFF;
+	Temp4 = 7;
+	}
 #ENDIF
 
-	mov	Temp1, #0FFh
-	mov	Temp3, #0FFh
-#IF MCU_48MHZ == 0
-	mov	Temp4, #3
-#ELSE
-	mov	Temp4, #7
-#ENDIF
-
-int0_int_pulse_ready:
-	mov	New_Rcp, Temp1					// Store new pulse length
-	setb	Flags2.RCP_UPDATED		 		// Set updated flag
+//int0_int_pulse_ready:
+	New_Rcp = Temp1;					// Store new pulse length
+	Flags2.RCP_UPDATED = 1;		 		// Set updated flag
 	// Check if zero
 	mov	A, Temp1						// Load new pulse value
-	jz	($+5)						// Check if pulse is zero
+	jz	($+5)							// Check if pulse is zero
 
-	mov	Rcp_Stop_Cnt, #0				// Reset rcp stop counter
+	Rcp_Stop_Cnt = 0;				// Reset rcp stop counter
 
 	// Set pwm limit
 	clr	C
-	mov	A, Pwm_Limit					// Limit to the smallest
-	mov	Temp5, A						// Store limit in Temp5
-	subb	A, Pwm_Limit_By_Rpm
-	jc	($+4)
-
-	mov	Temp5, Pwm_Limit_By_Rpm			
+	//mov	A, Pwm_Limit					// Limit to the smallest
+	//mov	Temp5, A						// Store limit in Temp5
+	//subb	A, Pwm_Limit_By_Rpm
+	//jc	($+4)
+	if(Pwm_Limit >= Pwm_Limit_By_Rpm)
+	Temp5 = Pwm_Limit_By_Rpm;			
 
 	// Check against limit
-	clr	C
-	mov	A, Temp5
-	subb	A, New_Rcp
-	jnc	int0_int_set_pwm_registers
-
+	//clr	C
+	//mov	A, Temp5
+	//subb	A, New_Rcp
+	//jnc	int0_int_set_pwm_registers
+	if(Pwm_Limit_By_Rpm < New_Rcp)
+	{
 	mov	A, Temp5						// Multiply limit by 4 (8 for 48MHz MCUs)
 #IF MCU_48MHZ == 0
-	mov	B, #4
-#ELSE
-	mov	B, #8
-#ENDIF
-	mul	AB
+	//mov	B, #4
+	Pwm_Limit_By_Rpm*4;
+	//mul	AB
 	mov	Temp3, A
 	mov	Temp4, B
-
-int0_int_set_pwm_registers:
-	mov	A, Temp3
-	cpl	A
-	mov	Temp1, A
-	mov	A, Temp4
-	cpl	A
-#IF MCU_48MHZ == 0
-	anl	A, #3
 #ELSE
-	anl	A, #7
-#ENDIF
-	mov	Temp2, A
-#IF FETON_DELAY != 0
-	clr	C
-	mov	A, Temp1						// Skew damping fet timing
-#IF MCU_48MHZ == 0
-	subb	A, #FETON_DELAY
-#ELSE
-	subb	A, #(FETON_DELAY SHL 1)
-#ENDIF
+	//mov	B, #8
+	Pwm_Limit_By_Rpm*8;
+	//mul	AB
 	mov	Temp3, A
-	mov	A, Temp2
-	subb	A, #0	
-	mov	Temp4, A
-	jnc	int0_int_set_pwm_damp_set
-
-	mov	Temp3, #0
-	mov	Temp4, #0
-
-int0_int_set_pwm_damp_set:
+	mov	Temp4, B
+#ENDIF
+	}
+//int0_int_set_pwm_registers:
+	//mov	A, Temp3
+	//cpl	A
+	//mov	Temp1, A
+	Temp1 = ~Temp3;
+	//mov	A, Temp4
+	//cpl	A
+#IF MCU_48MHZ == 0
+	//anl	A, #3
+	Temp2 = (~Temp4)&0x03;
+#ELSE
+	//anl	A, #7
+	Temp2 = (~Temp4)&0x07;
+#ENDIF
+	//mov	Temp2, A
+#IF FETON_DELAY != 0
+	//clr	C
+	//mov	A, Temp1						// Skew damping fet timing
+#IF MCU_48MHZ == 0
+	//subb	A, #FETON_DELAY
+	Temp3 = Temp1 - FETON_DELAY;
+#ELSE
+	//subb	A, #(FETON_DELAY<<1)
+	Temp3 = Temp1 - (FETON_DELAY<<1);
+#ENDIF
+	//mov	Temp3, A
+	//mov	A, Temp2
+	//subb	A, #0	
+	//mov	Temp4, A
+	Temp4 = Temp2 - 0;
+	//jnc	int0_int_set_pwm_damp_set
+	if(Temp2 < 0)
+	{
+	Temp3 = 0;
+	Temp4 = 0;
+	}
+//int0_int_set_pwm_damp_set:
 #ENDIF
 	Power_Pwm_Reg_L = Temp1;
 	Power_Pwm_Reg_H = Temp2;
@@ -735,47 +781,47 @@ int0_int_set_pwm_damp_set:
 #ENDIF
 	Rcp_Timeout_Cntd = 10;			// Set timeout count
 #IF FETON_DELAY != 0
-	pop	B							// Restore preserved registers
-	pop	ACC
-	pop	PSW
+	// Restore preserved registers
 	Clear_COVF_Interrupt
 	Enable_COVF_Interrupt				// Generate a pca interrupt
-	orl	EIE1, #10h					// Enable pca interrupts
-	reti
+	EIE1 |= 0x10;					// Enable pca interrupts
+	return;
 #ELSE
-	mov	A, Current_Power_Pwm_Reg_H
+	//mov	A, Current_Power_Pwm_Reg_H
 #IF MCU_48MHZ == 0
-	jnb	ACC.1, int0_int_set_pca_int_hi_pwm
+	if(Current_Power_Pwm_Reg_H&0x02) //int0_int_set_pca_int_hi_pwm
+	{
+		// Restore preserved registers
+		Clear_COVF_Interrupt;
+		Enable_COVF_Interrupt;				// Generate a pca interrupt
+		EIE1 |= 0x10;					// Enable pca interrupts
+		return;
+	}
 #ELSE
-	jnb	ACC.2, int0_int_set_pca_int_hi_pwm
+	if(Current_Power_Pwm_Reg_H&0x04) //int0_int_set_pca_int_hi_pwm
+	{
+		// Restore preserved registers
+		Clear_COVF_Interrupt;
+		Enable_COVF_Interrupt;				// Generate a pca interrupt
+		EIE1 |= 0x10;					// Enable pca interrupts
+		return;
+	}
 #ENDIF
 
-	pop	B							// Restore preserved registers
-	pop	ACC
-	pop	PSW
-	Clear_COVF_Interrupt
-	Enable_COVF_Interrupt				// Generate a pca interrupt
-	orl	EIE1, #10h					// Enable pca interrupts
-	reti
-
-int0_int_set_pca_int_hi_pwm:
-	pop	B							// Restore preserved registers
-	pop	ACC
-	pop	PSW
+//int0_int_set_pca_int_hi_pwm:
+	// Restore preserved registers
 	Clear_CCF_Interrupt
 	Enable_CCF_Interrupt				// Generate pca interrupt
-	orl	EIE1, #10h					// Enable pca interrupts
-	reti
+	EIE1 |= 0x10;					// Enable pca interrupts
+	return;
 #ENDIF
 
 int0_int_set_timeout:
-	mov	Rcp_Timeout_Cntd, #10			// Set timeout count
+	Rcp_Timeout_Cntd = 10;			// Set timeout count
 int0_int_exit:
-	pop	B							// Restore preserved registers
-	pop	ACC
-	pop	PSW
-	orl	EIE1, #10h					// Enable pca interrupts
-	reti
+	// Restore preserved registers
+	EIE1 |= 0x10;					// Enable pca interrupts
+	return;
 }
 
 //**** **** **** **** **** **** **** **** **** **** **** **** ****
@@ -815,26 +861,20 @@ void pca_int()
 		if(PCA0H&0x02) pca_int_exit;
 		if(PCA0H&0x01) pca_int_exit;
 	}
+	if(PCA0H&0x02) pca_int_exit;
+	if(PCA0H&0x01) pca_int_exit;
+	pca_int_set_pwm;
+	if(PCA0H&0x02) pca_int_exit;
+	if(PCA0H&0x01) pca_int_exit;
 #ELSE
 	if(!Current_Power_Pwm_Reg_H&0x04)
 	{
 		if(PCA0H&0x02) pca_int_exit;
 		if(PCA0H&0x01) pca_int_exit;
 	}
-#ENDIF
-
-#IF MCU_48MHZ == 0
-	if(PCA0H&0x02) pca_int_exit;
-	if(PCA0H&0x01) pca_int_exit;
-#ELSE
 	if(PCA0H&0x04) pca_int_exit;
 	if(PCA0H&0x02) pca_int_exit;
-#ENDIF
 	pca_int_set_pwm;
-#IF MCU_48MHZ == 0
-	if(PCA0H&0x02) pca_int_exit;
-	if(PCA0H&0x01) pca_int_exit;
-#ELSE
 	if(PCA0H&0x04) pca_int_exit;
 	if(PCA0H&0x02) pca_int_exit;
 #ENDIF
@@ -842,7 +882,6 @@ void pca_int()
 	Set_Damp_Pwm_Regs;
 	Current_Power_Pwm_Reg_H = Power_Pwm_Reg_H;
 	Disable_COVF_Interrupt;
-	
 #ELSE
 	Set_Power_Pwm_Regs;
 	Current_Power_Pwm_Reg_H = Power_Pwm_Reg_H;
@@ -853,16 +892,15 @@ void pca_int()
 	if(Flags2.RCP_DSHOT) EIE1 = 0xEF;
 	IE_EX1 = 1;
 	EIE1 = 0xEF;
-	
-pca_int_exit:
+}
+
+pca_int_exit()
+{
 	Clear_COVF_Interrupt;
 #IF FETON_DELAY == 0
 	Clear_CCF_Interrupt;
 #ENDIF
 	IE_EA = 1;
 }
-
-
-
 
 
